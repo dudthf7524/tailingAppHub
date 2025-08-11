@@ -182,9 +182,9 @@ const graphHeight = chartHeight - padding;
 const TailingDeviceMonitor = () => {
     const screenWidth = Dimensions.get('window').width;
     const [orientation, setOrientation] = useState('PORTRAIT');
-
     const route = useRoute();
     const { deviceId } = route.params as { deviceId: string };
+    const { deviceName } = route.params as { deviceName: string };
     const { tailingData } = useTailingData();
     const dataList = tailingData[deviceId] || [];
     const sliced = dataList.slice(-150);
@@ -225,7 +225,7 @@ const TailingDeviceMonitor = () => {
     return (
         <>
             <ScrollView style={styles.container}>
-                <Text style={styles.title}>{deviceId.toUpperCase()} 온도</Text>
+                <Text style={styles.title}>{deviceName.toUpperCase()} 온도</Text>
 
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <Svg width={chartWidth} height={chartHeight + 50}>
@@ -256,7 +256,7 @@ const TailingDeviceMonitor = () => {
                             );
                         })}
 
-                      
+
                         <Path
                             d={createPath()}
                             stroke="#F0663F"

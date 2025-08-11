@@ -186,6 +186,8 @@ const TailingDeviceMonitor = () => {
 
     const route = useRoute();
     const { deviceId } = route.params as { deviceId: string };
+    const { deviceName } = route.params as { deviceName: string };
+
     const { tailingData } = useTailingData();
     const dataList = tailingData[deviceId] || [];
     const sliced = dataList.slice(-150);
@@ -226,7 +228,7 @@ const TailingDeviceMonitor = () => {
     return (
         <>
             <ScrollView style={styles.container}>
-                <Text style={styles.title}>{deviceId.toUpperCase()} 심박수</Text>
+                <Text style={styles.title}>{deviceName.toUpperCase()} 심박수</Text>
 
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <Svg width={chartWidth} height={chartHeight + 50}>

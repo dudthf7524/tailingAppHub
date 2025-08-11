@@ -29,29 +29,34 @@ const TailingDataContext = createContext<TailingContextType>({
 export const useTailingData = () => useContext(TailingDataContext);
 
 export const TailingDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tailingData, setTailingData] = useState<Record<string, SensorData[]>>({
-    tailing1: [],
-    tailing2: [],
-    tailing3: [],
-    tailing4: [],
-    tailing5: [],
-  });
+  // const [tailingData, setTailingData] = useState<Record<string, SensorData[]>>({
+  //   tailing1: [],
+  //   tailing2: [],
+  //   tailing3: [],
+  //   tailing4: [],
+  //   tailing5: [],
+  // });
+
+  const [tailingData, setTailingData] = useState<Record<string, SensorData[]>>({});
+
+  // console.log("tailingData", tailingData)
 
   useEffect(() => {
     const socket = new WebSocket("ws://192.168.0.28:81");
-
     socket.onopen = () => {
       console.log("✅ 허브와 WebSocket 연결됨");
       socket.send("앱에서 인사!");
     };
 
     socket.onmessage = (event) => {
-      console.log(event.data)
+      
+      // console.log(event.data)
       const parts = event.data.split(',');
-      console.log(parts)
+      const deviceId = parts[0];
+      // console.log(parts)
       if (parts.length !== 9) return;
 
-      const [deviceId, seq, val1, val2, val3, val4, val5, val6, val7] = parts;
+      const [, seq, val1, val2, val3, val4, val5, val6, val7] = parts;
 
       // if (!['tailing1', 'tailing2', 'tailing3', 'tailing4', 'tailing5'].includes(deviceId)) return;
 
@@ -69,10 +74,10 @@ export const TailingDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       setTailingData(prev => {
         const updated = [...(prev[deviceId] || []), parsed];
-        console.log(updated)
+        // console.log(updated)
         return {
           ...prev,
-          [deviceId]: updated.slice(-150), // 마지막 50개만 유지
+          [deviceId]: updated.slice(-150), // 마지막 150개만 유지
         };
       });
     };
