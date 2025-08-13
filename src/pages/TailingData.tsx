@@ -12,7 +12,6 @@ interface DashboardDataProps {
   data: Data;
 }
 const TailingData = ({screen, data}: DashboardDataProps ) => {
-    console.log("data", data)
   return (
         <SafeAreaView style={styles.container}>
           <SafeAreaView style={styles.metrics_container}>

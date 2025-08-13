@@ -2,7 +2,6 @@ import { useState } from "react";
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native"
 import TailingDeviceMonitor from "./TailingDeviceMonitor";
 import TailingDetailTemp from "./TailingDetailTemp";
-import { useRoute } from "@react-navigation/native";
 
 const TailingDashBoard = () => {
     const [selectedView, setSelectedView] = useState('heart');

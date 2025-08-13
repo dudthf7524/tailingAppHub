@@ -4,27 +4,33 @@ import { useNavigation } from '@react-navigation/native';
 import { useTailingData } from '../contexts/TailingDataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../App';
 
 const API = 'http://192.168.0.42:3060';
+type Nav = NativeStackNavigationProp<RootStackParamList, 'TailingDeviceList'>;
 
 const TailingDeviceList = () => {
     const { tailingData } = useTailingData();
-    const navigation = useNavigation();
+    console.log("taling", tailingData)
+    const navigation = useNavigation<Nav>();
     const [deviceKeys, setDeviceKeys] = useState<string[]>([]);
     const [deviceList, setDeviceList] = useState<{ mac_address: string; device_name: string }[]>([]);
-    const [loadingList, setLoadingList] = useState(false);
 
     // 미등록 행의 입력값 관리: { [mac]: name }
     const [nameInputs, setNameInputs] = useState<Record<string, string>>({});
     const [registeringMac, setRegisteringMac] = useState<string | null>(null);
 
+    console.log("deviceList", deviceList)
+
     useEffect(() => {
         setDeviceKeys(Object.keys(tailingData));
     }, [tailingData]);
 
+    
+
     const fetchList = async () => {
         try {
-            setLoadingList(true);
             const { data } = await axios.get(`${API}/macAddress/list`);
             if (Array.isArray(data.result)) {
                 setDeviceList(data.result);
@@ -32,10 +38,8 @@ const TailingDeviceList = () => {
         } catch (e) {
             console.error('리스트 불러오기 실패', e);
         } finally {
-            setLoadingList(false);
         }
     };
-
     useEffect(() => {
         fetchList();
     }, []);
@@ -100,7 +104,7 @@ const TailingDeviceList = () => {
                     return (
                         <View key={mac} style={styles.row}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.mac}>{mac}</Text>
+                                {/* <Text style={styles.mac}>{mac}</Text> */}
                                 {isRegistered ? (
                                     <Text style={styles.name}>{info.device_name}</Text>
                                 ) : (
@@ -144,7 +148,7 @@ const TailingDeviceList = () => {
                     .map((d) => (
                         <View key={`db-${d.mac_address}`} style={[styles.row, { opacity: 0.6 }]}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.mac}>{d.mac_address}</Text>
+                                {/* <Text style={styles.mac}>{d.mac_address}</Text> */}
                                 <Text style={styles.name}>{d.device_name}</Text>
                             </View>
                             <View style={[styles.actionBtn, { backgroundColor: '#999' }]}>

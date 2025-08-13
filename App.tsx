@@ -10,22 +10,32 @@ import { TailingDataProvider } from './src/contexts/TailingDataContext.tsx';
 import TailingDashBoard from './src/pages/TailingDashBoard.tsx';
 import TailingData from './src/pages/TailingData.tsx';
 import Tailing1TextDisplay from './src/pages/Tailing1TextDisplay.tsx';
+import ServerFileList from './src/pages/ServerFileList.tsx';
+import DeviceNameManager from './src/pages/DeviceNameManager.tsx';
 
 export type LoggedInParamList = {
   Orders: undefined;
 };
 
+interface Data {
+  hrData: number | null;
+  spo2Data: number | null;
+  tempData: number | null;
+}
 export type RootStackParamList = {
   TailingDeviceList: undefined;
   TailingDeviceMonitor: undefined;
-  TailingDashBoard: undefined;
-  TailingData: undefined;
+  TailingDashBoard: { deviceId: string; deviceName: string };
+  TailingData: { screen: string; data: Data } | undefined;
   Tailing1TextDisplay: undefined;
+  ServerFileList: undefined
+  DeviceNameManager: undefined
 };
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<RootStackParamList>();
-
+//  <TailingDataProvider>
+//     </TailingDataProvider>
 function App() {
   const [isLoggedIn, setLoggedIn] = useState(false);
   return (
@@ -40,7 +50,20 @@ function App() {
             />
           </Tab.Navigator>
         ) : (
-          <Stack.Navigator>
+          <Stack.Navigator
+            screenOptions={{
+              contentStyle: { backgroundColor: '#fff' }, // ← 전체 화면 배경
+            }}>
+            <Stack.Screen
+              name="DeviceNameManager"
+              component={DeviceNameManager}
+              options={{ title: '디바이스 모니터링' }}
+            />
+            <Stack.Screen
+              name="ServerFileList"
+              component={ServerFileList}
+              options={{ title: '디바이스 모니터링' }}
+            />
             <Stack.Screen
               name="TailingDeviceList"
               component={TailingDeviceList}
@@ -70,7 +93,6 @@ function App() {
         )}
       </NavigationContainer>
     </TailingDataProvider>
-
   );
 }
 
