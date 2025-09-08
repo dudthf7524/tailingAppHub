@@ -49,7 +49,7 @@
 //     };
 
 //     socket.onmessage = (event) => {
-      
+
 //       console.log(event.data)
 //       const parts = event.data.split(',');
 //       const deviceId = parts[0];
@@ -109,7 +109,7 @@ type TailingContextType = { tailingData: Record<string, SensorData[]>; };
 const TailingDataContext = createContext<TailingContextType>({ tailingData: {} as any });
 export const useTailingData = () => useContext(TailingDataContext);
 
-export const TailingDataProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+export const TailingDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tailingData, setTailingData] = useState<Record<string, SensorData[]>>({});
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -126,7 +126,7 @@ export const TailingDataProvider: React.FC<{children: React.ReactNode}> = ({ chi
     setTailingData(prev => {
       const next = { ...prev };
       for (const id of keys) {
-        const merged = [ ...(prev[id] || []), ...buf[id] ];
+        const merged = [...(prev[id] || []), ...buf[id]];
         next[id] = merged.slice(-150);               // 마지막 150개만 유지
       }
       return next;
@@ -136,7 +136,8 @@ export const TailingDataProvider: React.FC<{children: React.ReactNode}> = ({ chi
   useEffect(() => {
     // 🔹 소켓은 1회만 생성
     // const ws = new WebSocket('ws://192.168.0.100:81');
-        const ws = new WebSocket('ws://192.168.0.28:81');
+    // const ws = new WebSocket('ws://192.168.0.28:81');
+    const ws = new WebSocket('ws://192.168.0.42:81');
 
     wsRef.current = ws;
 
@@ -181,11 +182,13 @@ export const TailingDataProvider: React.FC<{children: React.ReactNode}> = ({ chi
 
     // 🔹 언마운트/리렌더 시 정리
     return () => {
-      try { ws.removeEventListener('open', onOpen);
-            ws.removeEventListener('message', onMessage);
-            ws.removeEventListener('error', onError);
-            ws.removeEventListener('close', onClose);
-            ws.close(); } catch {}
+      try {
+        ws.removeEventListener('open', onOpen);
+        ws.removeEventListener('message', onMessage);
+        ws.removeEventListener('error', onError);
+        ws.removeEventListener('close', onClose);
+        ws.close();
+      } catch { }
       wsRef.current = null;
       if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
       bufferRef.current = {};
