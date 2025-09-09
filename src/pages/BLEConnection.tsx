@@ -8,6 +8,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import BleManager from 'react-native-ble-manager';
 import { Buffer } from 'buffer';
 import { getToken } from '../utils/token';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 const COLORS = {
@@ -43,6 +45,8 @@ export default function BLEConnection() {
     const [wifiSSID, setWifiSSID] = useState('');
     const [wifiPassword, setWifiPassword] = useState('');
     const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+    const [device, setDevice] = useState<Device>();
+
 
     const sendTextToESP32 = async (deviceId: string, text: string): Promise<boolean> => {
         try {
@@ -92,7 +96,7 @@ export default function BLEConnection() {
     }, []);
 
     const handleDiscoverPeripheral = (peripheral: any) => {
-        if (peripheral.name === 'ESP_GATTS_DEMO') {
+        if (peripheral.name === 'ESP32_S3') {
             console.log("peripheral", peripheral)
             const device: Device = {
                 id: peripheral.id,
@@ -121,7 +125,18 @@ export default function BLEConnection() {
         console.log("value", value)
         const decodedValue = Buffer.from(value, 'base64').toString('utf-8');
         console.log("decodedValue", decodedValue)
+        console.log("decodedValue 길이:", decodedValue.length)
+        console.log("decodedValue 바이트:", [...decodedValue].map(c => c.charCodeAt(0)))
+        console.log("device", device)
 
+        // 공백 제거 후 비교
+        const trimmedValue = decodedValue.trim();
+        console.log("trimmedValue:", trimmedValue.length)
+
+        if (trimmedValue === "wifi connected success" && device) {
+            console.log('🎉 WiFi 연결 성공! 장치 연결 해제 중...')
+            disconnectDevice(device);
+        }
     }, []);
 
     const checkPermissions = async () => {
@@ -225,6 +240,7 @@ export default function BLEConnection() {
 
             console.log('✅ 장치 연결 완료');
             // 연결 성공 후 WiFi 설정 모달 표시
+            setDevice(connectedDevice);
             setSelectedDeviceId(device.id);
             setShowWifiModal(true);
 
@@ -245,16 +261,34 @@ export default function BLEConnection() {
             console.log('   SSID:', wifiSSID);
             console.log('   Password:', wifiPassword);
 
-            const wifiInfo = `wifi:${wifiSSID},${wifiPassword}`;
+            const wifiInfo = `wifi:${wifiSSID},${wifiPassword},`;
             console.log('📦 최종 전송 데이터:', wifiInfo);
 
             const success = await sendTextToESP32(selectedDeviceId, wifiInfo);
 
             if (success) {
-                Alert.alert('전송 완료', 'WiFi 정보가 전송되었습니다.');
-                setShowWifiModal(false);
-                setWifiSSID('');
-                setWifiPassword('');
+                // hub_address를 AsyncStorage에 저장 (설정 완료 표시)
+                await AsyncStorage.setItem('hub_address', selectedDeviceId);
+
+                Alert.alert(
+                    '설정 완료',
+                    'WiFi 정보가 전송되었습니다.\n설정이 완료되어 메인 화면으로 이동합니다.',
+                    [
+                        {
+                            text: '확인',
+                            onPress: () => {
+                                // 앱 재시작을 위해 상태 변경 알림
+                                setShowWifiModal(false);
+                                setWifiSSID('');
+                                setWifiPassword('');
+                                // 강제로 앱을 다시 로드하거나 상태 업데이트
+                                setTimeout(() => {
+                                    Alert.alert('알림', '앱을 다시 시작해주세요.');
+                                }, 500);
+                            }
+                        }
+                    ]
+                );
             } else {
                 Alert.alert('전송 실패', 'WiFi 정보 전송에 실패했습니다.');
             }

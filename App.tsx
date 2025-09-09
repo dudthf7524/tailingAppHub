@@ -19,7 +19,11 @@ import Profile from './src/pages/Profile.tsx';
 import BLEConnection from './src/pages/BLEConnection.tsx';
 import { useEffect } from 'react';
 import { getToken } from './src/utils/token.ts';
-import { AppState } from 'react-native';
+import { Alert, AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import axios from 'axios';
+import Config from 'react-native-config';
 
 export type LoggedInParamList = {
   Orders: undefined;
@@ -52,7 +56,8 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function App() {
   const [isLoggedIn, setLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [needsBLESetup, setNeedsBLESetup] = useState(false);
+
   const checkLoginStatus = async () => {
     try {
       const token = await getToken();
@@ -66,13 +71,70 @@ function App() {
     }
   };
 
+  const checkHubStatus = async () => {
+    try {
+      const token = await getToken();
+      const access_token = token?.access_token;
+      console.log(token)
+      const result = await axios.get(`${Config.API_URL}/hub/get`, {
+        headers: { authorization: `Bearer ${access_token}` },
+      });
+      console.log("result", result.data.address)
+      if (result.data.address) {
+        setNeedsBLESetup(true);
+      } else {
+        setNeedsBLESetup(false);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setNeedsBLESetup(false);
+    }
+  };
+
+  // const checkLoginStatus = async () => {
+  //   try {
+  //     const token = await getToken();
+  //     console.log('checkLoginStatus - token:', token);
+  //     setLoggedIn(!!token);
+
+  //     // org_email과 hub_address 데이터 확인
+  //     if (token) {
+  //       const hasOrgEmail = !!token.org_email;
+  //       const result = await axios.get(`${Config.API_URL}/hub/get`, {
+  //         headers: { Authorization: `Bearer ${token}` },
+  //       });
+  //       console.log("result", result)
+  //       // AsyncStorage에서 hub_address 확인
+  //       // const hubAddress = await AsyncStorage.getItem('hub_address');
+  //       // const hasHubAddress = !!hubAddress;
+
+  //       // console.log('설정 상태 확인:', { hasOrgEmail, hasHubAddress });
+
+  //       // 둘 중 하나라도 없으면 BLE 설정 필요
+  //       // setNeedsBLESetup(!hasOrgEmail || !hasHubAddress);
+  //     }
+  //   } catch (error) {
+  //     console.error('토큰 확인 실패:', error);
+  //     setLoggedIn(false);
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
+  useEffect(() => {
+    checkHubStatus();
+  }, [])
+
   useEffect(() => {
     checkLoginStatus();
-    
+    // checkHubStatus();
+
     // 앱이 포어그라운드로 돌아올 때마다 로그인 상태 확인
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === 'active') {
         checkLoginStatus();
+        // checkHubStatus();
       }
     };
 
@@ -85,83 +147,60 @@ function App() {
     return null;
   }
   return (
-    <BLEProvider>
-      <TailingDataProvider>
+    <SafeAreaProvider>
+      <BLEProvider>
+        {/* <TailingDataProvider> */}
         <NavigationContainer>
-        {isLoggedIn ? (
-          <Tab.Navigator
-            screenOptions={{
-              tabBarIcon: () => null,
-              tabBarActiveTintColor: '#000',
-              tabBarInactiveTintColor: '#9ca3af',
-             
-              // contentStyle: { backgroundColor: '#fff' }, // ← 전체 화면 배경
-
-            }}>
-            {/* <Tab.Screen
-              name="DeviceNameManager"
-              component={DeviceNameManager}
-              options={{ title: '디바이스 모니터링' }}
-            />
-            <Tab.Screen
-              name="ServerFileList"
-              component={ServerFileList}
-              options={{ title: '디바이스 모니터링' }}
-            />
-            <Tab.Screen
-              name="TailingDeviceList"
-              component={TailingDeviceList}
-              options={{ title: '디바이스 목록' }}
-            /> */}
-            {/* <Tab.Screen
-              name="TailingData"
-              component={TailingData}
-              options={{ title: '데이터' }}
-            /> */}
-            {/* <Tab.Screen
-              name="TailingDashBoard"
-              component={TailingDashBoard}
-              options={{ title: '모니터링' }}
-            /> */}
-            {/* <Tab.Screen
-              name="TailingDeviceMonitor"
-              component={TailingDeviceMonitor}
-              options={{ title: '디바이스 모니터링' }}
-            /> */}
-            {/* <Tab.Screen
-              name="Tailing1TextDisplay"
-              component={Tailing1TextDisplay}
-              options={{ title: '디바이스 모니터링' }}
-            /> */}
-            <Tab.Screen
-              name="BLEConnection"
-              component={BLEConnection}
-              options={{ title: 'BLE 연결' }}
-            />
-            <Tab.Screen
-              name="Profile"
-              component={Profile}
-              options={{ title: '내 정보' }}
-            />
-          </Tab.Navigator>
-
-        ) : (
-          <Stack.Navigator>
-            <Stack.Screen
-              name="로그인"
-              component={Login}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="Join"
-              component={Join}
-              options={{ title: '회원가입' }}
-            />
-          </Stack.Navigator>
-        )}
-      </NavigationContainer>
-    </TailingDataProvider>
-    </BLEProvider>
+          {isLoggedIn ? (
+            !needsBLESetup ? (
+              // BLE 설정이 필요한 경우 - 튜토리얼/설정 스택
+              <Stack.Navigator>
+                <Stack.Screen
+                  name="BLEConnection"
+                  component={BLEConnection}
+                  options={{
+                    title: 'BLE 설정',
+                  }}
+                />
+              </Stack.Navigator>
+            ) : (
+              // 모든 설정이 완료된 경우 - 메인 탭 화면
+              <Tab.Navigator
+                screenOptions={{
+                  tabBarIcon: () => null,
+                  tabBarActiveTintColor: '#000',
+                  tabBarInactiveTintColor: '#9ca3af',
+                }}>
+                <Tab.Screen
+                  name="TailingDeviceList"
+                  component={TailingDeviceList}
+                  options={{ title: '디바이스 목록' }}
+                />
+                <Tab.Screen
+                  name="Profile"
+                  component={Profile}
+                  options={{ title: '내 정보' }}
+                />
+              </Tab.Navigator>
+            )
+          ) : (
+            <Stack.Navigator>
+              <Stack.Screen
+                name="로그인"
+                component={Login}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Join"
+                component={Join}
+                options={{ title: '회원가입' }}
+              />
+            </Stack.Navigator>
+          )}
+        </NavigationContainer>
+        {/* </TailingDataProvider> */}
+      </BLEProvider>
+    </SafeAreaProvider>
   );
 }
 
