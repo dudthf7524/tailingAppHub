@@ -159,7 +159,7 @@ function App() {
                   name="BLEConnection"
                   component={BLEConnection}
                   options={{
-                    title: 'BLE 설정',
+                    title: '허브 설정',
                   }}
                 />
               </Stack.Navigator>

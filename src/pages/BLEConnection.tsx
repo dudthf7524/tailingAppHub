@@ -7,7 +7,6 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import BleManager from 'react-native-ble-manager';
 import { Buffer } from 'buffer';
-import { getToken } from '../utils/token';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -45,8 +44,7 @@ export default function BLEConnection() {
     const [wifiSSID, setWifiSSID] = useState('');
     const [wifiPassword, setWifiPassword] = useState('');
     const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-    const [device, setDevice] = useState<Device>();
-
+    const [isProcessingWifiResponse, setIsProcessingWifiResponse] = useState(false);
 
     const sendTextToESP32 = async (deviceId: string, text: string): Promise<boolean> => {
         try {
@@ -127,16 +125,42 @@ export default function BLEConnection() {
         console.log("decodedValue", decodedValue)
         console.log("decodedValue 길이:", decodedValue.length)
         console.log("decodedValue 바이트:", [...decodedValue].map(c => c.charCodeAt(0)))
-        console.log("device", device)
 
         // 공백 제거 후 비교
         const trimmedValue = decodedValue.trim();
         console.log("trimmedValue:", trimmedValue.length)
+        console.log("trimmedValue:", trimmedValue)
 
-        if (trimmedValue === "wifi connected success" && device) {
-            console.log('🎉 WiFi 연결 성공! 장치 연결 해제 중...')
-            disconnectDevice(device);
+        // 중복 처리 방지
+        if (isProcessingWifiResponse) {
+            console.log('이미 WiFi 응답 처리 중...');
+            return;
         }
+
+        // connectedDevices에서 현재 연결된 장치 찾기
+        setConnectedDevices(prev => {
+            console.log("connectedDevices", prev)
+            const currentDevice = prev.find(d => d.isConnected);
+            console.log("currentDevice", currentDevice)
+
+            if (trimmedValue === "wifi connected success" && currentDevice) {
+
+                console.log('🎉 WiFi 연결 성공! 장치 연결 해제 중...')
+                setIsProcessingWifiResponse(true);
+                disconnectDevice(currentDevice);
+                // 3초 후 플래그 리셋
+                setTimeout(() => setIsProcessingWifiResponse(false), 3000);
+            } else if (trimmedValue === "wifi connect fail") {
+                console.log('❌ WiFi 연결 실패 처리 중...')
+                setIsProcessingWifiResponse(true);
+                setShowWifiModal(true);
+                Alert.alert('와이파이 연결에 실패 했습니다.');
+                // 3초 후 플래그 리셋
+                setTimeout(() => setIsProcessingWifiResponse(false), 3000);
+            }
+
+            return prev; // 상태 변경 없이 반환
+        });
     }, []);
 
     const checkPermissions = async () => {
@@ -240,7 +264,6 @@ export default function BLEConnection() {
 
             console.log('✅ 장치 연결 완료');
             // 연결 성공 후 WiFi 설정 모달 표시
-            setDevice(connectedDevice);
             setSelectedDeviceId(device.id);
             setShowWifiModal(true);
 
@@ -282,9 +305,9 @@ export default function BLEConnection() {
                                 setWifiSSID('');
                                 setWifiPassword('');
                                 // 강제로 앱을 다시 로드하거나 상태 업데이트
-                                setTimeout(() => {
-                                    Alert.alert('알림', '앱을 다시 시작해주세요.');
-                                }, 500);
+                                // setTimeout(() => {
+                                //     Alert.alert('알림', '앱을 다시 시작해주세요.');
+                                // }, 500);
                             }
                         }
                     ]
@@ -313,7 +336,7 @@ export default function BLEConnection() {
 
             await BleManager.disconnect(device.id);
             setConnectedDevices(prev => prev.filter(d => d.id !== device.id));
-            Alert.alert('연결 해제', `${device.name}의 연결이 해제되었습니다.`);
+            Alert.alert('연결 해제', `와이파이 연결이 성공하여 블루투스 연결이 해제되었습니다.`);
         } catch (error) {
             Alert.alert('연결 해제 실패', '장치 연결 해제에 실패했습니다.');
         }
@@ -358,12 +381,12 @@ export default function BLEConnection() {
     );
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             {/* 헤더 */}
-            <View style={styles.header}>
+            {/* <View style={styles.header}>
                 <Text style={styles.title}>BLE 연결 관리</Text>
                 <Text style={styles.subtitle}>허브와 센서 장치 연결</Text>
-            </View>
+            </View> */}
             {/* 스캔 컨트롤 */}
             <View style={styles.scanSection}>
                 <View style={styles.scanHeader}>
@@ -486,7 +509,7 @@ export default function BLEConnection() {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 }
 
