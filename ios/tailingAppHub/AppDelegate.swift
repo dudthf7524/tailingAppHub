@@ -2,6 +2,7 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import RNBootSplash
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -29,6 +30,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       launchOptions: launchOptions
     )
 
+    if let rootViewController = window?.rootViewController,
+       let rootView = rootViewController.view {
+      RNBootSplash.initWithStoryboard("LaunchScreen", rootView: rootView)
+    }
+    
     return true
   }
 }

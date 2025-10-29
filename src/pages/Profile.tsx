@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    KeyboardAvoidingView, Platform, ScrollView, Alert
+    ScrollView, Alert
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -24,6 +24,7 @@ const COLORS = {
     text: '#333333',
     cardBg: '#FFFFFF',
     hint: '#7A7A7A',
+    success: '#27AE60',
     error: '#E74C3C',
 };
 
@@ -114,80 +115,83 @@ export default function Profile({ navigation }: any) {
         );
     };
 
-    const InfoRow = ({ label, value, icon }: { label: string; value: string; icon: string }) => (
-        <View style={styles.infoRow}>
-            <View style={styles.infoLeft}>
-                <Ionicons name={icon as any} size={20} color={COLORS.primary} />
-                <Text style={styles.infoLabel}>{label}</Text>
-            </View>
-            <Text style={styles.infoValue}>{value}</Text>
-        </View>
-    );
-
     return (
         <View style={styles.container}>
-            <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: undefined })} style={styles.keyboardView}>
-                <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-                    {/* 헤더 */}
-                    <View style={styles.header}>
-                        <View style={styles.profileIcon}>
-                            <Ionicons name="person" size={40} color={COLORS.primary} />
-                        </View>
-                        <Text style={styles.brand}>내 정보</Text>
-                        <Text style={styles.subtitle}>사용자 정보 및 설정</Text>
-                    </View>
-
-                    {/* 사용자 정보 카드 */}
-                    <View style={styles.card}>
-                        <InfoRow label="이메일" value={userInfo.email} icon="mail" />
-                        <InfoRow label="기관명" value={userInfo.orgName} icon="business" />
-                        <InfoRow label="전화번호" value={userInfo.phone} icon="call" />
-                        <InfoRow label="가입일" value={userInfo.joinDate} icon="calendar" />
-                    </View>
-
-                    {/* 로그아웃 버튼 */}
+            {/* 통합 메뉴 섹션 */}
+            <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>홍길동</Text>
                     <TouchableOpacity
                         onPress={onLogout}
                         disabled={loading}
-                        style={[
-                            styles.logoutButton,
-                            loading && { opacity: 0.5 }
-                        ]}
                     >
-                        <Ionicons name="log-out" size={20} color="#fff" style={styles.buttonIcon} />
-                        <Text style={styles.logoutButtonText}>
+                        <Text style={[
+                            styles.logoutText,
+                            loading && { opacity: 0.5 }
+                        ]}>
                             {loading ? '로그아웃 중...' : '로그아웃'}
                         </Text>
                     </TouchableOpacity>
+                </View>
+                
+                <View style={styles.menuContainer}>
+                    <TouchableOpacity style={styles.menuItem}>
+                        <View style={styles.menuLeft}>
+                            <View style={styles.menuIconContainer}>
+                                <Ionicons name="person-outline" size={20} color={COLORS.primary} />
+                            </View>
+                            <Text style={styles.menuText}>프로필 수정</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.menuItem}>
+                        <View style={styles.menuLeft}>
+                            <View style={styles.menuIconContainer}>
+                                <Ionicons name="key-outline" size={20} color={COLORS.primary} />
+                            </View>
+                            <Text style={styles.menuText}>비밀번호 변경</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
+                    </TouchableOpacity>
 
-                    {/* 추가 설정 메뉴들 (선택사항) */}
-                    <View style={styles.menuContainer}>
-                        <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('알림', '준비 중인 기능입니다.')}>
-                            <View style={styles.menuLeft}>
-                                <Ionicons name="notifications" size={20} color={COLORS.hint} />
-                                <Text style={styles.menuText}>알림 설정</Text>
+                    {/* <TouchableOpacity style={styles.menuItem}>
+                        <View style={styles.menuLeft}>
+                            <View style={styles.menuIconContainer}>
+                                <Ionicons name="notifications-outline" size={20} color={COLORS.primary} />
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={COLORS.hint} />
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('알림', '준비 중인 기능입니다.')}>
-                            <View style={styles.menuLeft}>
-                                <Ionicons name="help-circle" size={20} color={COLORS.hint} />
-                                <Text style={styles.menuText}>도움말</Text>
+                            <Text style={styles.menuText}>알림 설정</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
+                    </TouchableOpacity> */}
+                    
+                    <TouchableOpacity 
+                        style={styles.menuItem}
+                        onPress={() => navigation.navigate('PrivacyPolicy')}
+                    >
+                        <View style={styles.menuLeft}>
+                            <View style={styles.menuIconContainer}>
+                                <Ionicons name="shield-outline" size={20} color={COLORS.primary} />
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={COLORS.hint} />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('알림', '준비 중인 기능입니다.')}>
-                            <View style={styles.menuLeft}>
-                                <Ionicons name="information-circle" size={20} color={COLORS.hint} />
-                                <Text style={styles.menuText}>앱 정보</Text>
+                            <Text style={styles.menuText}>개인정보 처리방침</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                        style={styles.menuItem}
+                        onPress={() => navigation.navigate('CustomerService')}
+                    >
+                        <View style={styles.menuLeft}>
+                            <View style={styles.menuIconContainer}>
+                                <Ionicons name="help-circle-outline" size={20} color={COLORS.primary} />
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={COLORS.hint} />
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
+                            <Text style={styles.menuText}>고객센터</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
+                    </TouchableOpacity>
+                </View>
+            </View>
         </View>
     );
 }
@@ -195,129 +199,72 @@ export default function Profile({ navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.bg
+        backgroundColor: COLORS.bg,
     },
-    keyboardView: {
-        flex: 1
-    },
-    scroll: {
-        flexGrow: 1,
-        paddingHorizontal: 24,
-        paddingVertical: 40,
-    },
-    header: {
-        alignItems: 'center',
-        marginBottom: 32,
-        width: '100%'
-    },
-    profileIcon: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+    section: {
         backgroundColor: COLORS.cardBg,
-        alignItems: 'center',
-        justifyContent: 'center',
+        margin: 16,
+        marginTop: 16,
         marginBottom: 16,
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 2,
-    },
-    brand: { 
-        fontSize: 28, 
-        fontWeight: '700', 
-        color: COLORS.text,
-        marginBottom: 4
-    },
-    subtitle: { 
-        fontSize: 14, 
-        color: '#475569' 
-    },
-    card: {
-        width: '100%',
-        backgroundColor: COLORS.cardBg,
-        borderRadius: 16,
         padding: 20,
-        marginBottom: 24,
+        borderRadius: 16,
         shadowColor: '#000',
         shadowOpacity: 0.06,
         shadowRadius: 12,
         shadowOffset: { width: 0, height: 6 },
         elevation: 3,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-    },
-    infoLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
         flex: 1,
     },
-    infoLabel: {
-        marginLeft: 12,
-        fontSize: 16,
+    sectionTitle: {
+        fontSize: 18,
         fontWeight: '600',
         color: COLORS.text,
     },
-    infoValue: {
-        fontSize: 16,
-        color: COLORS.hint,
-        textAlign: 'right',
-    },
-    logoutButton: {
-        backgroundColor: COLORS.error,
-        borderRadius: 28,
-        height: 52,
+    sectionHeader: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 24,
-        shadowColor: COLORS.error,
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 8 },
-        elevation: 2,
+        marginBottom: 20,
     },
-    buttonIcon: {
-        marginRight: 8,
-    },
-    logoutButtonText: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: '700'
+    logoutText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.error,
     },
     menuContainer: {
-        backgroundColor: COLORS.cardBg,
-        borderRadius: 16,
-        padding: 8,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 3,
+        flex: 1,
+        justifyContent: 'space-evenly',
     },
     menuItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        borderRadius: 12,
+        flex: 1,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F5F5F5',
     },
     menuLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
     },
+    menuIconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#F8F9FA',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
     menuText: {
-        marginLeft: 12,
         fontSize: 16,
         color: COLORS.text,
+        fontWeight: '500',
+    },
+    logoutButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

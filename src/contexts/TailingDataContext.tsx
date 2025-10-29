@@ -1,101 +1,3 @@
-// import React, { createContext, useContext, useState, useEffect } from 'react';
-
-// export type SensorData = {
-//   timestamp: number;
-//   cnt: number;
-//   ir: number;
-//   red: number;
-//   green: number;
-//   spo2: number;
-//   hr: number;
-//   temp: number;
-//   battery: number;
-// };
-
-// type TailingContextType = {
-//   tailingData: Record<string, SensorData[]>;
-// };
-
-// const TailingDataContext = createContext<TailingContextType>({
-//   tailingData: {
-//     tailing1: [],
-//     tailing2: [],
-//     tailing3: [],
-//     tailing4: [],
-//     tailing5: [],
-//   },
-// });
-
-// export const useTailingData = () => useContext(TailingDataContext);
-
-// export const TailingDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-//   // const [tailingData, setTailingData] = useState<Record<string, SensorData[]>>({
-//   //   tailing1: [],
-//   //   tailing2: [],
-//   //   tailing3: [],
-//   //   tailing4: [],
-//   //   tailing5: [],
-//   // });
-
-//   const [tailingData, setTailingData] = useState<Record<string, SensorData[]>>({});
-
-//   // console.log("tailingData", tailingData)
-
-//   useEffect(() => {
-//     const socket = new WebSocket("ws://192.168.0.28:81");
-//     socket.onopen = () => {
-//       console.log("✅ 허브와 WebSocket 연결됨");
-//       socket.send("앱에서 인사!");
-//     };
-
-//     socket.onmessage = (event) => {
-
-//       console.log(event.data)
-//       const parts = event.data.split(',');
-//       const deviceId = parts[0];
-//       // console.log(parts)
-//       if (parts.length !== 9) return;
-
-//       const [, seq, val1, val2, val3, val4, val5, val6, val7] = parts;
-
-//       // if (!['tailing1', 'tailing2', 'tailing3', 'tailing4', 'tailing5'].includes(deviceId)) return;
-
-//       const parsed: SensorData = {
-//         timestamp: Date.now(),
-//         cnt: Number(seq),
-//         ir: Number(val1),
-//         red: Number(val2),
-//         green: Number(val3),
-//         hr: Number(val4),
-//         spo2: Number(val5),
-//         temp: Number(val6),
-//         battery: Number(val7),
-//       };
-
-//       setTailingData(prev => {
-//         const updated = [...(prev[deviceId] || []), parsed];
-//         // console.log(updated)
-//         return {
-//           ...prev,
-//           [deviceId]: updated.slice(-150), // 마지막 150개만 유지
-//         };
-//       });
-//     };
-
-//     socket.onerror = (e) => console.error("❌ WebSocket 에러", e.message);
-//     socket.onclose = () => console.log("🔌 WebSocket 종료");
-
-//     return () => socket.close();
-//   }, []);
-
-//   return (
-//     <TailingDataContext.Provider value={{ tailingData }}>
-//       {children}
-//     </TailingDataContext.Provider>
-//   );
-// };
-
-
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
@@ -104,13 +6,35 @@ export type SensorData = {
   spo2: number; hr: number; temp: number; battery: number;
 };
 
-type TailingContextType = { tailingData: Record<string, SensorData[]>; };
+export type HubData = {
+  hub: {
+    [hubId: string]: {
+      devices: {
+        [deviceId: string]: {
+          data: SensorData;
+        };
+      };
+    };
+  };
+};
 
-const TailingDataContext = createContext<TailingContextType>({ tailingData: {} as any });
+type TailingContextType = { 
+  tailingData: Record<string, SensorData[]>; 
+  hubData: HubData | null;
+  connectedHubs: Set<string>;
+};
+
+const TailingDataContext = createContext<TailingContextType>({ 
+  tailingData: {} as any, 
+  hubData: null,
+  connectedHubs: new Set()
+});
 export const useTailingData = () => useContext(TailingDataContext);
 
 export const TailingDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tailingData, setTailingData] = useState<Record<string, SensorData[]>>({});
+  const [hubData, setHubData] = useState<HubData | null>(null);
+  const [connectedHubs, setConnectedHubs] = useState<Set<string>>(new Set());
   const wsRef = useRef<WebSocket | null>(null);
 
   // 🔹 초당 수십 번 들어오는 샘플을 즉시 setState하지 말고, 메모리 버퍼에 쌓았다가 주기적으로 한번에 반영
@@ -136,8 +60,8 @@ export const TailingDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
   useEffect(() => {
     // 🔹 소켓은 1회만 생성
     // const ws = new WebSocket('ws://192.168.0.100:81');
-    // const ws = new WebSocket('ws://192.168.0.28:81');
-    const ws = new WebSocket('ws://192.168.0.42:81');
+    // const ws = new WebSocket('ws://192.168.0.42:81');
+    const ws = new WebSocket('ws://192.168.0.42:3080/ws');
 
     wsRef.current = ws;
 
@@ -147,28 +71,66 @@ export const TailingDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     const onMessage = (event: WebSocketMessageEvent) => {
-      console.log("event.data", event.data)
-      const parts = String(event.data).split(',');
-      if (parts.length !== 9) return;
+      try {
+        const data = JSON.parse(event.data);
+        console.log("data", data);
+        // 새로운 데이터 구조인지 확인 (hubs 프로퍼티가 있는지)
+        if (data.hub) {
+          setHubData(data);
+          
+          // 연결된 허브 ID들을 추출
+          const hubIds = Object.keys(data.hub);
+          setConnectedHubs(prev => {
+            // 내용이 같으면 같은 Set 객체 반환 (리렌더링 방지)
+            const prevArray = Array.from(prev).sort();
+            const newArray = hubIds.sort();
+            if (prevArray.length === newArray.length && 
+                prevArray.every((id, idx) => id === newArray[idx])) {
+              return prev;
+            }
+            return new Set(hubIds);
+          });
+          
+          // 각 디바이스의 데이터를 tailingData에 저장
+          const newTailingData: Record<string, SensorData[]> = {};
+          Object.values(data.hub).forEach((hub: any) => {
+            Object.entries(hub.devices).forEach(([deviceId, deviceData]: [string, any]) => {
+              if (deviceData.data) {
+                newTailingData[deviceId] = [deviceData.data];
+              }
+            });
+          });
+          
+          if (Object.keys(newTailingData).length > 0) {
+            setTailingData(newTailingData);
+          }
+        } else {
+          // 기존 CSV 형식 데이터 처리 (하위 호환성)
+          const parts = String(event.data).split(',');
+          if (parts.length !== 9) return;
 
-      const [deviceId, seq, v1, v2, v3, v4, v5, v6, v7] = parts;
-      const parsed: SensorData = {
-        timestamp: Date.now(),
-        cnt: Number(seq),
-        ir: Number(v1), red: Number(v2), green: Number(v3),
-        hr: Number(v4), spo2: Number(v5), temp: Number(v6), battery: Number(v7),
-      };
+          const [deviceId, seq, v1, v2, v3, v4, v5, v6, v7] = parts;
+          const parsed: SensorData = {
+            timestamp: Date.now(),
+            cnt: Number(seq),
+            ir: Number(v1), red: Number(v2), green: Number(v3),
+            hr: Number(v4), spo2: Number(v5), temp: Number(v6), battery: Number(v7),
+          };
 
-      // 🔹 버퍼에만 쌓기
-      const buf = bufferRef.current;
-      (buf[deviceId] ||= []).push(parsed);
+          // 🔹 버퍼에만 쌓기
+          const buf = bufferRef.current;
+          (buf[deviceId] ||= []).push(parsed);
 
-      // 🔹 50~100ms마다 배치 반영 (너무 자주 setState 하지 않도록)
-      if (!flushTimerRef.current) {
-        flushTimerRef.current = setTimeout(() => {
-          flushTimerRef.current = null;
-          flush();
-        }, 80); // 필요에 따라 조절
+          // 🔹 50~100ms마다 배치 반영 (너무 자주 setState 하지 않도록)
+          if (!flushTimerRef.current) {
+            flushTimerRef.current = setTimeout(() => {
+              flushTimerRef.current = null;
+              flush();
+            }, 80); // 필요에 따라 조절
+          }
+        }
+      } catch (error) {
+        console.error("웹소켓 데이터 파싱 오류:", error);
       }
     };
 
@@ -206,7 +168,7 @@ export const TailingDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   return (
-    <TailingDataContext.Provider value={{ tailingData }}>
+    <TailingDataContext.Provider value={{ tailingData, hubData, connectedHubs }}>
       {children}
     </TailingDataContext.Provider>
   );

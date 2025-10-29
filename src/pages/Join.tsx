@@ -2,8 +2,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     View, Text, TextInput, StyleSheet, TouchableOpacity, Pressable,
-    KeyboardAvoidingView, Platform, ScrollView, Alert
+    KeyboardAvoidingView, Platform, ScrollView, Alert, Modal
 } from 'react-native';
+import DaumPostcode from '@actbase/react-daum-postcode';
 import api from '../constant/contants';
 
 const COLORS = {
@@ -12,30 +13,36 @@ const COLORS = {
     text: '#333333',
     cardBg: '#FFFFFF',
     hint: '#7A7A7A',
+    success: '#27AE60',
     error: '#E74C3C',
-    ok: '#27AE60',
 };
 
-type Form = {
-    orgName: string;
-    orgAddress: string;
-    username: string;     // 아이디
-    email: string;        // 이메일
+type User = {
+    email: string;
+    name: string;
+    zipCode: string;
+    baseAddress: string;
+    detailAddress: string;
     password: string;
-    password2: string;
-    phone: string;
-    emailCode: string;    // 인증 코드(6자리)
+    verifyPassword: string;
+    phone1: string;
+    phone2: string;
+    phone3: string;
+    emailCode: string;
 };
 
 export default function SignUpScreen() {
-    const [form, setForm] = useState<Form>({
-        orgName: '',
-        orgAddress: '',
-        username: '',
+    const [form, setForm] = useState<User>({
         email: '',
+        name: '',
+        zipCode: '',
+        baseAddress: '',
+        detailAddress: '',
         password: '',
-        password2: '',
-        phone: '',
+        verifyPassword: '',
+        phone1: '010',
+        phone2: '',
+        phone3: '',
         emailCode: '',
     });
 
@@ -49,7 +56,10 @@ export default function SignUpScreen() {
     const [cooldown, setCooldown] = useState(0); // 재전송 쿨다운(초)
     const cooldownRef = useRef<NodeJS.Timeout | null>(null);
 
-    const set = (k: keyof Form, v: string) => {
+    // 주소 검색 모달 상태
+    const [showAddressModal, setShowAddressModal] = useState(false);
+
+    const set = (k: keyof User, v: string) => {
         if (k === 'email') {
             // 이메일이 바뀌면 인증 초기화
             setEmailVerified(false);
@@ -68,45 +78,18 @@ export default function SignUpScreen() {
     const emailRegex =
         /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
-    // 간단 유효성
-    const errors = useMemo(() => {
-        const e: Partial<Record<keyof Form, string>> = {};
-        if (!form.orgName.trim()) e.orgName = '기관명을 입력하세요.';
-        if (!form.orgAddress.trim()) e.orgAddress = '기관주소를 입력하세요.';
-        if (!/^[a-zA-Z0-9._-]{4,20}$/.test(form.username)) {
-            e.username = '아이디는 4~20자 영문/숫자/._-만 가능합니다.';
-        }
-        if (!emailRegex.test(form.email)) e.email = '올바른 이메일을 입력하세요.';
-        if (form.password.length < 8) e.password = '비밀번호는 8자 이상이어야 합니다.';
-        if (form.password2 !== form.password) e.password2 = '비밀번호가 일치하지 않습니다.';
-        const digits = form.phone.replace(/\D/g, '');
-        if (digits.length < 9 || digits.length > 15) e.phone = '전화번호를 정확히 입력하세요.';
-        // 이메일 인증 전이면 안내만, 차단은 isValid에서 처리
-        return e;
-    }, [form]);
+    // 유효성 검사는 onSubmit에서 Alert로 처리
 
-    const isValidWithoutEmailVerify = useMemo(
-        () => Object.keys(errors).length === 0,
-        [errors]
-    );
-
-    // const isValid = isValidWithoutEmailVerify && emailVerified;
-
-    const isValid = true;
-
-    // 전화번호 포맷
-    const formatPhone = (input: string) => {
-        const d = input.replace(/\D/g, '');
-        if (d.startsWith('02')) {
-            if (d.length <= 2) return d;
-            if (d.length <= 5) return `${d.slice(0, 2)}-${d.slice(2)}`;
-            if (d.length <= 9) return `${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5)}`;
-            return `${d.slice(0, 2)}-${d.slice(2, 6)}-${d.slice(6, 10)}`;
-        }
-        if (d.length <= 3) return d;
-        if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`;
-        if (d.length <= 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
-        return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7, 11)}`;
+    // 전화번호 입력 핸들러
+    const handlePhoneInput = (field: 'phone2' | 'phone3', value: string) => {
+        const digits = value.replace(/\D/g, '');
+        console.log(`🔢 전화번호 입력: ${field} = "${digits}" (원본: "${value}")`);
+        setForm(prev => {
+            const newForm = { ...prev, [field]: digits };
+            console.log(`📱 폼 업데이트 후: phone2="${newForm.phone2}", phone3="${newForm.phone3}"`);
+            console.log(`📱 전체 폼 상태:`, newForm);
+            return newForm;
+        });
     };
 
     // 쿨다운 타이머
@@ -182,28 +165,117 @@ export default function SignUpScreen() {
         }
     };
 
+    // 주소 검색 완료 처리
+    const handleAddressSelect = (data: any) => {
+        let baseAddress = data.address;
+        let extraAddress = '';
+
+        if (data.addressType === 'R') {
+            if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+                extraAddress += data.bname;
+            }
+            if (data.buildingName !== '' && data.apartment === 'Y') {
+                extraAddress += (extraAddress !== '' ? `, ${data.buildingName}` : data.buildingName);
+            }
+            if (extraAddress !== '') {
+                extraAddress = ` (${extraAddress})`;
+            }
+            baseAddress += extraAddress;
+        }
+
+        setForm(prev => ({ 
+            ...prev, 
+            zipCode: data.zonecode,
+            baseAddress: baseAddress,
+            detailAddress: '' // 상세주소는 초기화
+        }));
+        setShowAddressModal(false);
+    };
+
+    // 주소 검색 모달 열기
+    const openAddressSearch = () => {
+        setShowAddressModal(true);
+    };
+
     const onSubmit = async () => {
-        if (!isValid) {
-            Alert.alert('확인', '입력값과 이메일 인증을 확인해주세요.');
+        // 기관명 유효성 검사
+        if (!form.name.trim()) {
+            Alert.alert('확인', '기관명을 입력하세요.');
+            return;
+        }
+        if (!/^[a-zA-Z0-9._-]{4,20}$/.test(form.name)) {
+            Alert.alert('확인', '아이디는 4~20자 영문/숫자/._-만 가능합니다.');
+            return;
+        }
+        
+        // 주소 유효성 검사
+        if (!form.zipCode.trim()) {
+            Alert.alert('확인', '우편번호를 검색해주세요.');
+            return;
+        }
+        if (!form.baseAddress.trim()) {
+            Alert.alert('확인', '기본주소를 검색해주세요.');
+            return;
+        }
+        if (!form.detailAddress.trim()) {
+            Alert.alert('확인', '상세주소를 입력하세요.');
+            return;
+        }
+        
+        // 이메일 유효성 검사
+        if (!emailRegex.test(form.email)) {
+            Alert.alert('확인', '올바른 이메일을 입력하세요.');
+            return;
+        }
+        
+        // 비밀번호 유효성 검사
+        if (form.password.length < 8) {
+            Alert.alert('확인', '비밀번호는 8자 이상이어야 합니다.');
+            return;
+        }
+        if (form.verifyPassword !== form.password) {
+            Alert.alert('확인', '비밀번호가 일치하지 않습니다.');
+            return;
+        }
+        
+        // 전화번호 유효성 검사
+        if (!form.phone2.trim()) {
+            Alert.alert('확인', '전화번호를 입력하세요.');
+            return;
+        }
+        if (!form.phone3.trim()) {
+            Alert.alert('확인', '전화번호를 입력하세요.');
+            return;
+        }
+        
+        // 이메일 인증 검사
+        if (!emailVerified) {
+            Alert.alert('확인', '이메일 인증을 완료해주세요.');
             return;
         }
         try {
             setSubmitting(true);
-            //   실제 회원가입 API (서버 스키마에 맞게 수정)
+            const fullAddress = `${form.baseAddress} ${form.detailAddress}`.trim();
+            const fullPhone = `${form.phone1}${form.phone2}${form.phone3}`;
             await api.post('/user/join', {
-                org_name: form.orgName.trim(),
-                org_address: form.orgAddress.trim(),
-                org_email: form.email.trim(),
-                org_pw: form.password,
-                org_phone: form.phone.replace(/\D/g, ''),
-                marketingAgreed: false,
-                smsAgreed: false,
-                emailAgreed: false,
-                pushAgreed: false,
+                email: form.email.trim(),
+                name: form.name.trim(),
+                zipCode: form.zipCode.trim(),
+                baseAddress: form.baseAddress.trim(),
+                detailAddress: form.detailAddress.trim(),
+                address: fullAddress, // 전체 주소도 함께 전송
+                password: form.password,
+                phone1: form.phone1,
+                phone2: form.phone2,
+                phone3: form.phone3,
+                phone: fullPhone, // 전체 전화번호도 함께 전송
+                // marketingAgreed: false,
+                // smsAgreed: false,
+                // emailAgreed: false,
+                // pushAgreed: false,
             });
-
-            await new Promise(res => setTimeout(res, 700));
-            Alert.alert('회원가입 완료', '관리자 승인 후 로그인할 수 있어요.');
+            // await new Promise(res => setTimeout(res, 700));
+            Alert.alert('회원가입 완료', '로그인 페이지로 이동합니다.');
         } catch (e: any) {
             Alert.alert('오류', e?.message ?? '회원가입에 실패했습니다.');
         } finally {
@@ -219,18 +291,67 @@ export default function SignUpScreen() {
                     <View style={styles.card}>
                         <LabeledInput
                             label="기관명"
-                            value={form.orgName}
-                            onChangeText={v => set('orgName', v)}
+                            value={form.name}
+                            onChangeText={v => set('name', v)}
                             placeholder="예) 조이동물의료센터"
-                            error={errors.orgName}
                         />
-                        <LabeledInput
-                            label="기관주소"
-                            value={form.orgAddress}
-                            onChangeText={v => set('orgAddress', v)}
-                            placeholder="예) 서울 강남구 테일링로 123"
-                            error={errors.orgAddress}
-                        />
+                        {/* 기관주소 섹션 */}
+                        <View style={styles.addressSection}>
+                            <Text style={styles.inputLabel}>기관주소</Text>
+                            
+                            {/* 우편번호 */}
+                            <View style={{ marginBottom: 16 }}>
+                                <View style={styles.inputWrap}>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={form.zipCode}
+                                        onChangeText={v => set('zipCode', v)}
+                                        placeholder="우편번호"
+                                        placeholderTextColor={COLORS.hint}
+                                        editable={false}
+                                        selectTextOnFocus={false}
+                                        autoCorrect={false}
+                                    />
+                                    <View style={styles.rightAction} pointerEvents="box-none">
+                                        <TouchableOpacity onPress={openAddressSearch}>
+                                            <Text style={styles.actionLink}>주소 찾기</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </View>
+                            
+                            {/* 기본주소 */}
+                            <View style={{ marginBottom: 16 }}>
+                                <View style={styles.inputWrap}>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={form.baseAddress}
+                                        onChangeText={v => set('baseAddress', v)}
+                                        placeholder="기본주소"
+                                        placeholderTextColor={COLORS.hint}
+                                        editable={false}
+                                        selectTextOnFocus={false}
+                                        autoCorrect={false}
+                                    />
+                                </View>
+                            </View>
+                            
+                            {/* 상세주소 */}
+                            <View style={{ marginBottom: 16 }}>
+                                <View style={styles.inputWrap}>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={form.detailAddress}
+                                        onChangeText={v => set('detailAddress', v)}
+                                        placeholder="상세주소 (예: 101호, 2층)"
+                                        placeholderTextColor={COLORS.hint}
+                                        editable={true}
+                                        selectTextOnFocus={true}
+                                        autoCorrect={false}
+                                    />
+                                </View>
+                            </View>
+                        </View>
 
                         {/* 이메일 + 코드 발송 */}
                         <LabeledInput
@@ -240,7 +361,6 @@ export default function SignUpScreen() {
                             placeholder="name@hospital.com"
                             autoCapitalize="none"
                             keyboardType="email-address"
-                            error={!emailVerified ? errors.email : undefined}
                             rightAction={
                                 <TouchableOpacity
                                     onPress={sendEmailCode}
@@ -266,7 +386,7 @@ export default function SignUpScreen() {
                                 </TouchableOpacity>
                             }
                             hint={emailVerified ? '이메일 인증이 완료되었습니다.' : undefined}
-                            hintColor={emailVerified ? COLORS.ok : undefined}
+                            hintColor={emailVerified ? COLORS.success : undefined}
                         />
 
                         <LabeledInput
@@ -280,12 +400,11 @@ export default function SignUpScreen() {
                                     <Text style={styles.eye}>{showPw ? 'Hide' : 'Show'}</Text>
                                 </TouchableOpacity>
                             }
-                            error={errors.password}
                         />
                         <LabeledInput
                             label="비밀번호 확인"
-                            value={form.password2}
-                            onChangeText={v => set('password2', v)}
+                            value={form.verifyPassword}
+                            onChangeText={v => set('verifyPassword', v)}
                             placeholder="비밀번호 재입력"
                             secureTextEntry={!showPw2}
                             rightAction={
@@ -293,23 +412,69 @@ export default function SignUpScreen() {
                                     <Text style={styles.eye}>{showPw2 ? 'Hide' : 'Show'}</Text>
                                 </TouchableOpacity>
                             }
-                            error={errors.password2}
                         />
-                        <LabeledInput
-                            label="담당자 전화번호"
-                            value={form.phone}
-                            onChangeText={v => set('phone', formatPhone(v))}
-                            placeholder="010-1234-5678"
-                            keyboardType="phone-pad"
-                            error={errors.phone}
-                        />
+                        {/* 전화번호 */}
+                        <View style={styles.phoneSection}>
+                            <Text style={styles.inputLabel}>담당자 전화번호</Text>
+                            <View style={styles.phoneRow}>
+                                <View style={[styles.phoneField, { flex: 1, marginRight: 8 }]}>
+                                    <View style={styles.phoneInputWrap}>
+                                        <TextInput
+                                            style={styles.phoneInput}
+                                            value="010"
+                                            onChangeText={() => {}}
+                                            placeholder="010"
+                                            placeholderTextColor={COLORS.hint}
+                                            keyboardType="numeric"
+                                            editable={false}
+                                            selectTextOnFocus={false}
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                </View>
+                                <Text style={styles.phoneDash}>-</Text>
+                                <View style={[styles.phoneField, { flex: 1, marginHorizontal: 8 }]}>
+                                    <View style={styles.phoneInputWrap}>
+                                        <TextInput
+                                            style={styles.phoneInput}
+                                            value={form.phone2}
+                                            onChangeText={v => handlePhoneInput('phone2', v)}
+                                            placeholder="1234"
+                                            placeholderTextColor={COLORS.hint}
+                                            keyboardType="numeric"
+                                            maxLength={4}
+                                            editable={true}
+                                            selectTextOnFocus={true}
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                </View>
+                                <Text style={styles.phoneDash}>-</Text>
+                                <View style={[styles.phoneField, { flex: 1, marginLeft: 8 }]}>
+                                    <View style={styles.phoneInputWrap}>
+                                        <TextInput
+                                            style={styles.phoneInput}
+                                            value={form.phone3}
+                                            onChangeText={v => handlePhoneInput('phone3', v)}
+                                            placeholder="5678"
+                                            placeholderTextColor={COLORS.hint}
+                                            keyboardType="numeric"
+                                            maxLength={4}
+                                            editable={true}
+                                            selectTextOnFocus={true}
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
 
                         <Pressable
                             onPress={onSubmit}
-                            disabled={!isValid || submitting}
+                            disabled={submitting}
                             style={({ pressed }) => [
                                 styles.button,
-                                (!isValid || submitting) && { opacity: 0.5 },
+                                submitting && { opacity: 0.5 },
                                 pressed && { transform: [{ scale: 0.99 }] },
                             ]}
                         >
@@ -322,6 +487,38 @@ export default function SignUpScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* 주소 검색 모달 */}
+            <Modal
+                visible={showAddressModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={() => setShowAddressModal(false)}>
+                            <Text style={styles.modalCloseButton}>닫기</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>주소 검색</Text>
+                        <View style={{ width: 40 }} />
+                    </View>
+                    <DaumPostcode
+                        style={{ flex: 1 }}
+                        jsOptions={{ 
+                            animation: false,  // 애니메이션 비활성화로 성능 향상
+                            hideMapBtn: true,   // 지도 버튼 숨김으로 로딩 시간 단축
+                            hideEngBtn: true,   // 영문 버튼 숨김
+                            alwaysShowEngAddr: false,
+                            submitMode: true    // 제출 모드로 빠른 선택
+                        }}
+                        onSelected={handleAddressSelect}
+                        onError={(error) => {
+                            console.error('주소 검색 오류:', error);
+                            Alert.alert('오류', '주소 검색 중 오류가 발생했습니다.');
+                        }}
+                    />
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -338,14 +535,17 @@ function LabeledInput(props: {
     rightAction?: React.ReactNode;
     autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
     keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
+    editable?: boolean;
+    maxLength?: number;
+    noMargin?: boolean;
 }) {
     const {
         label, value, onChangeText, placeholder, error, hint, hintColor,
-        secureTextEntry, rightAction, autoCapitalize, keyboardType
+        secureTextEntry, rightAction, autoCapitalize, keyboardType, editable = true, maxLength, noMargin = false
     } = props;
     return (
-        <View style={{ marginBottom: 16 }}>
-            <Text style={styles.inputLabel}>{label}</Text>
+        <View style={noMargin ? {} : { marginBottom: 16 }}>
+            {label ? <Text style={styles.inputLabel}>{label}</Text> : null}
             <View style={styles.inputWrap}>
                 <TextInput
                     style={styles.input}
@@ -356,9 +556,10 @@ function LabeledInput(props: {
                     secureTextEntry={secureTextEntry}
                     autoCapitalize={autoCapitalize}
                     keyboardType={keyboardType}
-                    editable={true}
-                    selectTextOnFocus={true}
+                    editable={editable}
+                    selectTextOnFocus={editable}
                     autoCorrect={false}
+                    maxLength={maxLength}
                 />
                 {rightAction ? <View style={styles.rightAction} pointerEvents="box-none">{rightAction}</View> : null}
             </View>
@@ -369,25 +570,16 @@ function LabeledInput(props: {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.bg },
-    scroll: { padding: 24, paddingBottom: 40 },
-    header: { alignItems: 'center', marginTop: 24, marginBottom: 16 },
-    logoHeart: {
-        width: 40, height: 32, borderWidth: 3, borderColor: COLORS.primary,
-        borderTopLeftRadius: 20, borderTopRightRadius: 20,
-        borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
-        transform: [{ rotate: '45deg' }], marginBottom: 6,
-    },
-    brand: { fontSize: 28, fontWeight: '700', color: COLORS.text },
-    subtitle: { marginTop: 6, fontSize: 14, color: '#475569' },
+    container: { flex: 1, backgroundColor: "#ffffff" },
+    scroll: { padding: 16, paddingBottom: 40 },
     card: {
-        marginTop: 16, backgroundColor: COLORS.cardBg, borderRadius: 16, padding: 20,
-        shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 }, elevation: 3,
+       borderRadius: 16, padding: 20,
+        // shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12,
+        // shadowOffset: { width: 0, height: 6 }, elevation: 3,
     },
     inputLabel: { marginBottom: 8, color: COLORS.text, fontWeight: '600' },
     inputWrap: {
-        position: 'relative', backgroundColor: '#fff', borderRadius: 28,
+        position: 'relative', backgroundColor: '#fff', borderRadius: 10,
         borderWidth: 1, borderColor: '#EFE7E0', paddingHorizontal: 18, paddingVertical: 10,
     },
     input: { height: 44, fontSize: 16, color: COLORS.text, paddingRight: 80, flex: 1 },
@@ -404,4 +596,71 @@ const styles = StyleSheet.create({
     },
     buttonText: { color: '#fff', fontSize: 18, fontWeight: '700' },
     helper: { marginTop: 16, textAlign: 'center', color: '#475569', fontSize: 14 },
+    // 모달 스타일
+    modalContainer: { flex: 1, backgroundColor: '#fff' },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E5E5',
+    },
+    modalCloseButton: { fontSize: 16, color: COLORS.primary, fontWeight: '600' },
+    modalTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+    // 주소 관련 스타일
+    addressSection: { marginBottom: 16 },
+    // 전화번호 관련 스타일
+    phoneSection: { marginBottom: 16 },
+    phoneRow: { 
+        flexDirection: 'row', 
+        alignItems: 'center',
+        justifyContent: 'space-between'
+    },
+    phoneField: { flex: 1 },
+    phoneDash: { 
+        fontSize: 18, 
+        fontWeight: '600', 
+        color: COLORS.hint,
+        marginHorizontal: 4
+    },
+    // 고정된 입력 필드 스타일
+    fixedInputWrap: {
+        backgroundColor: '#F8F9FA',
+        borderColor: '#DEE2E6',
+    },
+    fixedInput: {
+        color: COLORS.text,
+        fontWeight: '700',
+        textAlign: 'center',
+        fontSize: 16,
+    },
+    fixedInputText: {
+        color: COLORS.text,
+        fontWeight: '700',
+        textAlign: 'center',
+        fontSize: 16,
+        height: 44,
+        lineHeight: 44,
+    },
+    // 전화번호 전용 스타일
+    phoneInputWrap: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#EFE7E0',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        justifyContent: 'center',
+    },
+    phoneInput: {
+        height: 44,
+        fontSize: 16,
+        color: '#000000',
+        fontWeight: 'normal',
+        textAlign: 'center',
+        padding: 0,
+        margin: 0,
+    },
 });

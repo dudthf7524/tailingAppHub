@@ -7,7 +7,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../constant/contants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { setToken } from '../utils/token';
+import userSlice from '../slices/user';
+import { useAppDispatch } from '../store';
+import EncryptedStorage from 'react-native-encrypted-storage';
 
 // JWT 토큰 디코딩 함수
 const decodeJWT = (token: string) => {
@@ -32,17 +34,18 @@ const COLORS = {
 
 export default function SignInScreen({ navigation }: any) {
     const [email, setEmail] = useState('');
-    const [pw, setPw] = useState('');
+    const [password, setPassword] = useState('');
     const [showPw, setShowPw] = useState(false);
     const [loading, setLoading] = useState(false);
+    const dispatch = useAppDispatch();
 
     const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
     const errors = useMemo(() => {
         const e: any = {};
         if (!emailRegex.test(email)) e.email = '올바른 이메일을 입력하세요.';
-        if (pw.length < 8) e.pw = '비밀번호는 8자 이상이어야 합니다.';
+        if (password.length < 8) e.pw = '비밀번호는 8자 이상이어야 합니다.';
         return e;
-    }, [email, pw]);
+    }, [email, password]);
 
     const isValid = Object.keys(errors).length === 0;
 
@@ -54,54 +57,34 @@ export default function SignInScreen({ navigation }: any) {
         try {
             setLoading(true);
             console.log("email", email)
-            console.log("pw", pw)
+            console.log("password", password)
             // 실제 로그인 API 호출
-            const res = await api.post('/user/login', {
-                org_email: email,
-                org_pw: pw
+            const response = await api.post('/user/login', {
+                email: email,
+                password: password
             });
-            // 서버에서 받은 토큰 추출
-            const { token } = res.data.data;
 
-            // AsyncStorage에 토큰 저장 (TokenData 형태로 저장)
-            const tokenData = {
-                device_code: '',
-                org_email: email,
-                access_token: token
-            };
-            await setToken(tokenData);
+            if (response.status === 401) {
+                Alert.alert('로그인 실패', response.data.message);
+            } else if (response.status === 402) {
+                Alert.alert('로그인 실패', response.data.message);
+            } else if (response.status === 200) {
 
-            // 토큰에서 이메일 정보 추출
-            const decodedToken = decodeJWT(token);
-            const userEmail = decodedToken?.email || decodedToken?.org_email || decodedToken?.sub || 'Unknown';
+                dispatch(
+                    userSlice.actions.setUser({
+                        id: response.data.data.id,
+                        email: response.data.data.email,
+                        accessToken: response.data.data.accessToken,
+                    }),
+                );
 
-            // 콘솔에 토큰 및 이메일 정보 출력
-            console.log('=== 로그인 성공 ===');
-            console.log('Access Token:', token);
-            console.log('토큰에서 추출한 이메일:', userEmail);
-            console.log('토큰 전체 페이로드:', decodedToken);
-            console.log('==================');
+                await EncryptedStorage.setItem(
+                    'refreshToken',
+                    response.data.data.refreshToken,
+                );
 
-            Alert.alert('로그인 성공', '환영합니다!', [
-                {
-                    text: '확인',
-                    onPress: () => {
-                        // 앱을 완전히 새로고침하는 방법
-                        // DevSettings로 리로드 (개발환경에서만 사용)
-                        // 프로덕션에서는 다른 방법 필요
-                        if (__DEV__) {
-                            const DevSettings = require('react-native').DevSettings;
-                            DevSettings.reload();
-                        } else {
-                            // 프로덕션에서는 navigation reset
-                            navigation.reset({
-                                index: 0,
-                                routes: [{ name: '로그인' }],
-                            });
-                        }
-                    }
-                }
-            ]);
+                Alert.alert('로그인 성공', '환영합니다!');
+            }
         } catch (e: any) {
             console.error('로그인 실패:', e.response?.data || e.message);
             Alert.alert('로그인 실패', e?.response?.data?.message || e?.message || '이메일 또는 비밀번호를 확인하세요.');
@@ -165,8 +148,8 @@ export default function SignInScreen({ navigation }: any) {
                         />
                         <LabeledInput
                             label="비밀번호"
-                            value={pw}
-                            onChangeText={setPw}
+                            value={password}
+                            onChangeText={setPassword}
                             placeholder="비밀번호를 입력하세요"
                             secureTextEntry={!showPw}
                             rightAction={
@@ -178,7 +161,7 @@ export default function SignInScreen({ navigation }: any) {
                                     />
                                 </TouchableOpacity>
                             }
-                            error={pw.length > 0 ? errors.pw : undefined}
+                            error={password.length > 0 ? errors.password : undefined}
                         />
 
                         <Pressable
@@ -200,11 +183,11 @@ export default function SignInScreen({ navigation }: any) {
                         </TouchableOpacity>
 
                         {/* 디버깅용 토큰 확인 버튼 */}
-                        <TouchableOpacity onPress={checkStoredToken} style={{ marginTop: 10 }}>
+                        {/* <TouchableOpacity onPress={checkStoredToken} style={{ marginTop: 10 }}>
                             <Text style={[styles.linkCenter, { color: COLORS.hint, fontSize: 12 }]}>
                                 저장된 토큰 확인 (디버그용)
                             </Text>
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
                     </View>
 
                     {/* 하단 안내 */}
@@ -261,7 +244,7 @@ function LabeledInput(props: {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.bg
+        backgroundColor: COLORS.cardBg
     },
     keyboardView: {
         flex: 1
@@ -279,12 +262,7 @@ const styles = StyleSheet.create({
         marginBottom: 32,
         width: '100%'
     },
-    logoHeart: {
-        width: 40, height: 32, borderWidth: 3, borderColor: COLORS.primary,
-        borderTopLeftRadius: 20, borderTopRightRadius: 20,
-        borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
-        transform: [{ rotate: '45deg' }], marginBottom: 6,
-    },
+ 
     brand: { fontSize: 28, fontWeight: '700', color: COLORS.text },
     subtitle: { marginTop: 6, fontSize: 14, color: '#475569' },
     card: {
@@ -293,15 +271,10 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.cardBg,
         borderRadius: 16,
         padding: 20,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 3,
     },
     inputLabel: { marginBottom: 8, color: COLORS.text, fontWeight: '600' },
     inputWrap: {
-        position: 'relative', backgroundColor: '#fff', borderRadius: 28,
+        position: 'relative', backgroundColor: '#fff', borderRadius: 10,
         borderWidth: 1, borderColor: '#EFE7E0', paddingHorizontal: 18, paddingVertical: 10,
     },
     input: { height: 44, fontSize: 16, color: COLORS.text },

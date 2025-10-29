@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, FlatList,
-    Alert, Platform, PermissionsAndroid, ActivityIndicator, TextInput, Modal
+    Alert, Platform, PermissionsAndroid, ActivityIndicator, TextInput, Modal, ScrollView
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
@@ -32,6 +32,19 @@ const SERVICE_UUID = '000000ff-0000-1000-8000-00805f9b34fb';
 const CHARACTERISTIC_UUID_TX = '0000ff01-0000-1000-8000-00805f9b34fb';
 
 // BleManagerModule과 bleManagerEmitter는 더 이상 사용하지 않음 (BleManager.on* 방식 사용)
+// const start = "s:";
+// const end = "e:"
+
+// const wifi = "wifi:";
+// const wifiID = "조이동물병원,";
+// const wifi_Password = "12345678";
+
+// const sum =  wifi + wifiID  + wifi_Password;
+// console.log("sum : ", sum);
+// const textBytes: number[] = Array.from(sum, (char: string) => char.charCodeAt(0));
+// console.log("textBytes : ", textBytes);
+// console.log("textBytes 갯수: ", textBytes.length);
+
 
 export default function BLEConnection() {
     const [isScanning, setIsScanning] = useState(false);
@@ -45,22 +58,111 @@ export default function BLEConnection() {
     const [wifiPassword, setWifiPassword] = useState('');
     const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
     const [isProcessingWifiResponse, setIsProcessingWifiResponse] = useState(false);
+    const [deviceMTU, setDeviceMTU] = useState<Map<string, number>>(new Map());
+
+
+
+
 
     const sendTextToESP32 = async (deviceId: string, text: string): Promise<boolean> => {
         try {
             console.log('📤 ESP32로 전송할 데이터:', text);
             console.log('📤 Device ID:', deviceId);
 
-            // 문자열을 바이트 배열로 변환
-            const textBytes: number[] = Array.from(text, (char: string) => char.charCodeAt(0));
+            const texta = "s:" + text + "dudthf7524@naver.com";
+            
+            console.log('📤 ESP32로 전송할 데이터:', texta);
 
-            // BLE Write 실행
-            await BleManager.write(
-                deviceId,                    // 연결된 디바이스 ID
-                SERVICE_UUID,               // 서비스 UUID
-                CHARACTERISTIC_UUID_TX,     // 특성 UUID
-                textBytes                   // 전송할 데이터 (바이트 배열)
-            );
+            // 문자열을 UTF-8 바이트 배열로 변환 (버퍼 사용)
+            const fullTextBytes = Buffer.from(texta, 'utf-8');
+            const textBytes = Array.from(fullTextBytes);
+
+            console.log('📦 변환된 바이트 배열:', textBytes);
+            console.log('📦 바이트 배열 길이:', textBytes.length);
+
+            // 협상된 MTU를 가져오거나 기본값 20바이트 사용
+            const maxChunkSize = deviceMTU.get(deviceId) || 20;
+            console.log('📏 사용 가능한 청크 크기:', maxChunkSize);
+            
+            // BLE 순차 전송하여 데이터가 정확히 전달되도록 함
+            const CHUNK_SIZE = maxChunkSize;
+            const totalChunks = Math.ceil(textBytes.length / CHUNK_SIZE);
+            
+            console.log(`📤 총 ${totalChunks}개 청크로 나누어 순차 전송합니다 (청크 크기: ${CHUNK_SIZE} bytes)`);
+            
+            // 마지막 청크가 17바이트 초과인지 추적
+            let shouldSendEndMarker = false;
+            
+            // 순차적으로 전송 (각 청크가 완전히 전송될 때까지 대기)
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, textBytes.length);
+                const chunk = textBytes.slice(start, end);
+                
+                // 마지막 청크인지 확인
+                console.log("i : ", i);
+                console.log("totalChunks : ", totalChunks);
+                console.log("chunk.length : ", chunk.length);
+                
+                let finalChunk = chunk;
+                
+                if (i === totalChunks - 1) {
+                    // 마지막 청크인 경우
+                    const endMarker = Buffer.from("e:", 'utf-8');
+                    const endBytes = Array.from(endMarker);
+                    
+                    console.log("endBytes.length : ", endBytes.length);
+                    
+                    // 마지막 청크가 17바이트 이하인 경우만 "e:"를 붙임
+                    if (chunk.length <= 17) {
+                        // "e:"를 앞에 붙임
+                        finalChunk = [...endBytes, ...chunk];
+                        console.log("✅ e: 추가 성공 (마지막 청크에 포함)");
+                    } else {
+                        shouldSendEndMarker = true;
+                        console.log("❌ 마지막 청크가 17바이트 초과 - e: 별도 전송 예정");
+                    }
+                    
+                    // 바이트 배열을 문자열로 변환하여 출력
+                    const chunkString = Buffer.from(finalChunk).toString('utf-8');
+                    console.log(`📦 마지막 청크 전송 중... (${finalChunk.length} bytes)`);
+                    console.log(`📝 청크 내용: "${chunkString}"`);
+                } else {
+                    // 바이트 배열을 문자열로 변환하여 출력
+                    const chunkString = Buffer.from(chunk).toString('utf-8');
+                    console.log(`📦 청크 ${i + 1}/${totalChunks} 전송 중... (${chunk.length} bytes)`);
+                    console.log(`📝 청크 내용: "${chunkString}"`);
+                }
+                
+                // 각 청크를 순차적으로 전송하고 완료될 때까지 대기
+                await BleManager.write(
+                    deviceId,
+                    SERVICE_UUID,
+                    CHARACTERISTIC_UUID_TX,
+                    finalChunk
+                );
+                
+                // 각 전송 사이에 짧은 지연 (BLE 스택이 안정적으로 처리할 수 있도록)
+                if (i < totalChunks - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 2));
+                }
+            }
+            
+            // 마지막 청크가 17바이트 초과였던 경우 별도로 "e:" 전송
+            if (shouldSendEndMarker) {
+                const endMarker = Buffer.from("e:", 'utf-8');
+                const endBytes = Array.from(endMarker);
+                
+                console.log('📦 마지막으로 "e:" 마커 전송 중...');
+                console.log(`📝 마커 내용: "${Buffer.from(endBytes).toString('utf-8')}"`);
+                
+                await BleManager.write(
+                    deviceId,
+                    SERVICE_UUID,
+                    CHARACTERISTIC_UUID_TX,
+                    endBytes
+                );
+            }
 
             console.log('✅ 데이터 전송 성공!');
             return true;
@@ -284,7 +386,7 @@ export default function BLEConnection() {
             console.log('   SSID:', wifiSSID);
             console.log('   Password:', wifiPassword);
 
-            const wifiInfo = `wifi:${wifiSSID},${wifiPassword},`;
+            const wifiInfo = `${wifiSSID},${wifiPassword},`;
             console.log('📦 최종 전송 데이터:', wifiInfo);
 
             const success = await sendTextToESP32(selectedDeviceId, wifiInfo);
