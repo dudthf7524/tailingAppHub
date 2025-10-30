@@ -9,6 +9,8 @@ import BleManager from 'react-native-ble-manager';
 import { Buffer } from 'buffer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store/reducer';
 
 
 const COLORS = {
@@ -31,21 +33,6 @@ interface Device {
 const SERVICE_UUID = '000000ff-0000-1000-8000-00805f9b34fb';
 const CHARACTERISTIC_UUID_TX = '0000ff01-0000-1000-8000-00805f9b34fb';
 
-// BleManagerModule과 bleManagerEmitter는 더 이상 사용하지 않음 (BleManager.on* 방식 사용)
-// const start = "s:";
-// const end = "e:"
-
-// const wifi = "wifi:";
-// const wifiID = "조이동물병원,";
-// const wifi_Password = "12345678";
-
-// const sum =  wifi + wifiID  + wifi_Password;
-// console.log("sum : ", sum);
-// const textBytes: number[] = Array.from(sum, (char: string) => char.charCodeAt(0));
-// console.log("textBytes : ", textBytes);
-// console.log("textBytes 갯수: ", textBytes.length);
-
-
 export default function BLEConnection() {
     const [isScanning, setIsScanning] = useState(false);
     const [connectedDevices, setConnectedDevices] = useState<Device[]>([]);
@@ -59,17 +46,14 @@ export default function BLEConnection() {
     const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
     const [isProcessingWifiResponse, setIsProcessingWifiResponse] = useState(false);
     const [deviceMTU, setDeviceMTU] = useState<Map<string, number>>(new Map());
-
-
-
-
-
+    const email = useSelector((state: RootState) => state.user.email);
+console.log("email : " ,email);
     const sendTextToESP32 = async (deviceId: string, text: string): Promise<boolean> => {
         try {
             console.log('📤 ESP32로 전송할 데이터:', text);
             console.log('📤 Device ID:', deviceId);
 
-            const texta = "s:" + text + "dudthf7524@naver.com";
+            const texta = "s:" + text + email;
             
             console.log('📤 ESP32로 전송할 데이터:', texta);
 
@@ -642,12 +626,12 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.cardBg,
         margin: 16,
         padding: 20,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 3,
+        // borderRadius: 16,
+        // shadowColor: '#000',
+        // shadowOpacity: 0.06,
+        // shadowRadius: 12,
+        // shadowOffset: { width: 0, height: 6 },
+        // elevation: 3,
     },
     scanHeader: {
         flexDirection: 'row',
@@ -704,12 +688,12 @@ const styles = StyleSheet.create({
         margin: 16,
         marginTop: 0,
         padding: 20,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 3,
+        // borderRadius: 16,
+        // shadowColor: '#000',
+        // shadowOpacity: 0.06,
+        // shadowRadius: 12,
+        // shadowOffset: { width: 0, height: 6 },
+        // elevation: 3,
         flex: 1,
     },
     deviceList: {

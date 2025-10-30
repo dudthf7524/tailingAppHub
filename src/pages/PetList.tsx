@@ -39,7 +39,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'PetRegistration'>;
 export default function PetList() {
     const accessToken = useSelector((state: RootState) => state.user.accessToken);
     const [pets, setPets] = useState<Pet[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true); // 초기값을 true로 설정
     const [refreshing, setRefreshing] = useState(false);
     const navigation = useNavigation<Nav>();
 
@@ -48,16 +48,33 @@ export default function PetList() {
 
         try {
             setIsLoading(true);
+            const startTime = Date.now();
+
             const response = await api.get('/pet/list', {
                 headers: { authorization: `${accessToken}` },
             });
-            
+
             if (Array.isArray(response.data.data)) {
                 setPets(response.data.data);
+            }
+
+            // 최소 3초 로딩 시간 보장
+            const elapsed = Date.now() - startTime;
+            const remaining = Math.max(0, 1000 - elapsed);
+
+            if (remaining > 0) {
+                await new Promise(resolve => setTimeout(resolve, remaining));
             }
         } catch (error: any) {
             console.error('펫 목록 로드 실패:', error);
             Alert.alert('오류', '펫 목록을 불러오는데 실패했습니다.');
+
+            // 에러 시에도 최소 3초 표시
+            const elapsed = Date.now();
+            const remaining = Math.max(0, 3000 - elapsed);
+            if (remaining > 0) {
+                await new Promise(resolve => setTimeout(resolve, remaining));
+            }
         } finally {
             setIsLoading(false);
         }
@@ -334,12 +351,12 @@ const styles = StyleSheet.create({
         margin: 16,
         marginTop: 16,
         padding: 20,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 3,
+        // borderRadius: 16,
+        // shadowColor: '#000',
+        // shadowOpacity: 0.06,
+        // shadowRadius: 12,
+        // shadowOffset: { width: 0, height: 6 },
+        // elevation: 3,
         flex: 1,
     },
     sectionHeader: {
@@ -360,11 +377,11 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: COLORS.primary,
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 4,
+        // shadowColor: COLORS.primary,
+        // shadowOpacity: 0.3,
+        // shadowRadius: 8,
+        // shadowOffset: { width: 0, height: 4 },
+        // elevation: 4,
     },
     petList: {
         flex: 1,

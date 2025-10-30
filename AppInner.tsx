@@ -4,12 +4,15 @@ import BLEConnection from "./src/pages/BLEConnection";
 import HubList from "./src/pages/HubList";
 import PetList from "./src/pages/PetList";
 import Profile from "./src/pages/Profile";
+import ProfileEdit from "./src/pages/ProfileEdit";
 import PetRegistration from "./src/pages/PetRegistration";
 import PetDetail from "./src/pages/PetDetail";
+import PetEdit from "./src/pages/PetEdit";
 import TailingDeviceList from "./src/pages/DeviceList";
 import TailingDashBoard from "./src/pages/TailingDashBoard";
 import CustomerService from "./src/pages/CustomerService";
 import PrivacyPolicy from "./src/pages/PrivacyPolicy";
+import CSVDownload from "./src/pages/CSVDownload";
 import Login from "./src/pages/Login";
 import Join from "./src/pages/Join";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -112,6 +115,7 @@ export type RootStackParamList = {
     ServerFileList: undefined
     DeviceNameManager: undefined
     Profile: undefined;
+    ProfileEdit: undefined;
     Login: undefined;
     Join: undefined;
     로그인: undefined;
@@ -119,8 +123,10 @@ export type RootStackParamList = {
     PetRegistration: undefined;
     PetList: { deviceId?: string; deviceName?: string } | undefined;
     PetDetail: any;
+    PetEdit: { pet: any };
     CustomerService: undefined;
     PrivacyPolicy: undefined;
+    CSVDownload: undefined;
 };
 
 function AppInner() {
@@ -240,7 +246,8 @@ function AppInner() {
                         component={PetRegistration}
                         options={{
                             title: '펫 등록',
-                            headerBackTitleVisible: false,
+                            headerBackTitleVisible: true,
+                            headerBackTitle:"펫 목록",
                             headerTitleAlign: 'center',
                             headerShadowVisible: false,
                         }}
@@ -261,6 +268,15 @@ function AppInner() {
                             title: '펫 상세',
                             headerShown: true,
                             headerBackTitle: '펫 목록'
+                        }}
+                    />
+                    <Stack.Screen
+                        name="PetEdit"
+                        component={PetEdit}
+                        options={{
+                            title: '펫 수정',
+                            headerShown: true,
+                            headerBackTitle: '펫 상세'
                         }}
                     />
                     <Stack.Screen
@@ -299,6 +315,24 @@ function AppInner() {
                             headerBackTitle: '내 정보'
                         }}
                     />
+                <Stack.Screen
+                    name="ProfileEdit"
+                    component={ProfileEdit}
+                    options={{
+                        title: '프로필 수정',
+                        headerShown: true,
+                        headerBackTitle: '내 정보'
+                    }}
+                />
+                <Stack.Screen
+                    name="CSVDownload"
+                    component={CSVDownload}
+                    options={{
+                        title: 'CSV 다운로드',
+                        headerShown: true,
+                        headerBackTitle: '내 정보'
+                    }}
+                />
                 </>
             ) : (
                 // 로그인 전 - 로그인/회원가입 스택

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView,
     Alert, Pressable
@@ -8,6 +8,7 @@ import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import api from '../constant/contants';
 import { RootState } from '../store/reducer';
 import { useSelector } from 'react-redux';
+import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 
 const COLORS = {
     primary: '#F0663F',
@@ -33,6 +34,12 @@ type PetForm = {
     medicalHistory: string;
 };
 
+type PetEditParams = {
+    PetEdit: {
+        pet: any;
+    };
+};
+
 const PET_SPECIES = [
     { label: '개', value: 'dog' },
     { label: '고양이', value: 'cat' },
@@ -49,15 +56,19 @@ const NEUTERING_OPTIONS = [
     { label: '중성화안함', value: 'intact' },
 ];
 
-export default function PetRegistration() {
+export default function PetEdit() {
+    const route = useRoute<RouteProp<PetEditParams, 'PetEdit'>>();
+    const navigation = useNavigation<any>();
     const accessToken = useSelector((state: RootState) => state.user.accessToken);
+    const petData = route.params?.pet;
+
     const [form, setForm] = useState<PetForm>({
         name: '',
         species: '',
         breed: '',
         weight: '',
-        gender: '', // 기본값: 선택 안함
-        neutering: '', // 기본값: 선택 안함
+        gender: '',
+        neutering: '',
         birthDate: '',
         admissionDate: '',
         veterinarian: '',
@@ -67,6 +78,25 @@ export default function PetRegistration() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showBirthDateModal, setShowBirthDateModal] = useState(false);
     const [showAdmissionDateModal, setShowAdmissionDateModal] = useState(false);
+
+    // 기존 데이터 로드
+    useEffect(() => {
+        if (petData) {
+            setForm({
+                name: petData.name || '',
+                species: petData.species || '',
+                breed: petData.breed || '',
+                weight: petData.weight ? String(petData.weight) : '',
+                gender: petData.gender || '',
+                neutering: petData.neutering || '',
+                birthDate: petData.birthDate || '',
+                admissionDate: petData.admissionDate || '',
+                veterinarian: petData.veterinarian || '',
+                diagnosis: petData.diagnosis || '',
+                medicalHistory: petData.medicalHistory || '',
+            });
+        }
+    }, [petData]);
 
     const updateForm = (key: keyof PetForm, value: string) => {
         setForm(prev => ({ ...prev, [key]: value }));
@@ -129,20 +159,18 @@ export default function PetRegistration() {
         return true;
     };
 
-    console.log("accessToken", accessToken);
-
     const handleSubmit = async () => {
         if (!validateForm()) return;
 
         try {
             setIsSubmitting(true);
-            const response = await api.post('/pet/register', {
+            const response = await api.put(`/pet/update/${petData.id}`, {
                 name: form.name.trim(),
                 species: form.species,
                 breed: form.breed.trim(),
                 weight: parseFloat(form.weight),
-                gender: form.gender, // string: 'male' | 'female'
-                neutering: form.neutering, // string: 'sterilized' | 'intact'
+                gender: form.gender,
+                neutering: form.neutering,
                 birthDate: form.birthDate.trim(),
                 admissionDate: form.admissionDate.trim(),
                 veterinarian: form.veterinarian.trim(),
@@ -152,33 +180,16 @@ export default function PetRegistration() {
                 headers: { authorization: `${accessToken}` },
             });
 
-            if(response.status === 200){
-
-            }
-
-            Alert.alert('성공', `${response.data.message}`, [
+            Alert.alert('성공', '펫 정보가 수정되었습니다.', [
                 {
                     text: '확인', onPress: () => {
-                        // 폼 초기화
-                        setForm({
-                            name: '',
-                            species: '',
-                            breed: '',
-                            weight: '',
-                            gender: '',
-                            neutering: '',
-                            birthDate: '',
-                            admissionDate: '',
-                            veterinarian: '',
-                            diagnosis: '',
-                            medicalHistory: '',
-                        });
+                        navigation.goBack();
                     }
                 }
             ]);
         } catch (error: any) {
-            console.error('펫 등록 오류:', error);
-            Alert.alert('오류', error?.response?.data?.message || '펫 등록 중 오류가 발생했습니다.');
+            console.error('펫 수정 오류:', error);
+            Alert.alert('오류', error?.response?.data?.message || '펫 수정 중 오류가 발생했습니다.');
         } finally {
             setIsSubmitting(false);
         }
@@ -351,7 +362,7 @@ export default function PetRegistration() {
                             pressed && { transform: [{ scale: 0.99 }] },
                         ]}
                     >
-                        <Text style={styles.buttonText}>{isSubmitting ? '처리 중...' : '펫 등록하기'}</Text>
+                        <Text style={styles.buttonText}>{isSubmitting ? '처리 중...' : '수정하기'}</Text>
                     </Pressable>
                 </View>
             </ScrollView>
@@ -412,13 +423,13 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.bg },
     scroll: { padding: 16 },
     card: {
-        backgroundColor: COLORS.cardBg, 
-        // borderRadius: 16, 
+        backgroundColor: COLORS.cardBg,
+        // borderRadius: 16,
         padding: 20,
-        // shadowColor: '#000', 
-        // shadowOpacity: 0.06, 
+        // shadowColor: '#000',
+        // shadowOpacity: 0.06,
         // shadowRadius: 12,
-        // shadowOffset: { width: 0, height: 6 }, 
+        // shadowOffset: { width: 0, height: 6 },
         // elevation: 3,
     },
     inputLabel: { marginBottom: 8, color: COLORS.text, fontWeight: '600' },

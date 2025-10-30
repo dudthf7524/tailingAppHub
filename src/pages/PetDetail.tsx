@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import api from '../constant/contants';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/reducer';
@@ -34,6 +34,7 @@ type PetDetailParams = {
 
 export default function PetDetail() {
     const route = useRoute<RouteProp<PetDetailParams, 'PetDetail'>>();
+    const navigation = useNavigation<any>();
     const accessToken = useSelector((state: RootState) => state.user.accessToken);
     const initialPet = route.params;
     const petId = (initialPet as any)?.id;
@@ -139,6 +140,12 @@ export default function PetDetail() {
                                 {getSpeciesLabel(pet?.species || '')} • {getGenderLabel(pet?.gender || '')} • {calculateAge(pet?.birthDate || '')}
                             </Text>
                         </View>
+                        <TouchableOpacity
+                            style={styles.editButton}
+                            onPress={() => navigation.navigate('PetEdit', { pet })}
+                        >
+                            <Ionicons name="create-outline" size={24} color={COLORS.primary} />
+                        </TouchableOpacity>
                     </View>
 
                     {/* 구분선 */}
@@ -201,13 +208,13 @@ const styles = StyleSheet.create({
     scroll: { padding: 16, paddingBottom: 32 },
     card: {
         backgroundColor: COLORS.cardBg,
-        borderRadius: 16,
+        // borderRadius: 16,
         padding: 20,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 3,
+        // shadowColor: '#000',
+        // shadowOpacity: 0.06,
+        // shadowRadius: 12,
+        // shadowOffset: { width: 0, height: 6 },
+        // elevation: 3,
     },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     petIconContainer: {
@@ -222,6 +229,16 @@ const styles = StyleSheet.create({
     },
     title: { fontSize: 22, fontWeight: '700', color: COLORS.text },
     subtitle: { marginTop: 4, fontSize: 13, color: COLORS.hint },
+    editButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#FFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#EFE7E0',
+    },
     sectionDivider: { height: 1, backgroundColor: '#EFE7E0', marginVertical: 20 },
     sectionTitle: { fontSize: 18, fontWeight: '600', color: COLORS.text, marginBottom: 16 },
     row2: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },

@@ -176,11 +176,11 @@ export default function SignInScreen({ navigation }: any) {
                             <Text style={styles.buttonText}>{loading ? '로그인 중...' : '로그인'}</Text>
                         </Pressable>
 
-                        <TouchableOpacity onPress={onForgot} style={{ marginTop: 14 }}>
+                        {/* <TouchableOpacity onPress={onForgot} style={{ marginTop: 14 }}>
                             <Text style={[styles.linkCenter, { color: COLORS.primary, fontWeight: '700' }]}>
                                 비밀번호를 잊으셨나요?
                             </Text>
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
 
                         {/* 디버깅용 토큰 확인 버튼 */}
                         {/* <TouchableOpacity onPress={checkStoredToken} style={{ marginTop: 10 }}>

@@ -1,12 +1,10 @@
-// SignUpScreen.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    View, Text, TextInput, StyleSheet, TouchableOpacity, Pressable,
-    KeyboardAvoidingView, Platform, ScrollView, Alert, Modal
+    View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Modal,
+    KeyboardAvoidingView, Platform, ScrollView, Pressable
 } from 'react-native';
 import DaumPostcode from '@actbase/react-daum-postcode';
 import api from '../constant/contants';
-import { useNavigation } from '@react-navigation/native';
 
 const COLORS = {
     primary: '#F0663F',
@@ -18,50 +16,41 @@ const COLORS = {
     error: '#E74C3C',
 };
 
-type User = {
-    email: string;
+type ProfileForm = {
     name: string;
     zipCode: string;
     baseAddress: string;
     detailAddress: string;
-    password: string;
-    verifyPassword: string;
+    email: string;
+    emailCode: string;
     phone1: string;
     phone2: string;
     phone3: string;
-    emailCode: string;
 };
 
-export default function SignUpScreen() {
-    const navigation = useNavigation<any>();
-    const [form, setForm] = useState<User>({
-        email: '',
+export default function ProfileEdit() {
+    const [form, setForm] = useState<ProfileForm>({
         name: '',
         zipCode: '',
         baseAddress: '',
         detailAddress: '',
-        password: '',
-        verifyPassword: '',
+        email: '',
+        emailCode: '',
         phone1: '010',
         phone2: '',
         phone3: '',
-        emailCode: '',
     });
 
-    const [showPw, setShowPw] = useState(false);
-    const [showPw2, setShowPw2] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
-
-    // 이메일 인증 상태
     const [emailSending, setEmailSending] = useState(false);
     const [emailVerified, setEmailVerified] = useState(false);
-    const [cooldown, setCooldown] = useState(0); // 재전송 쿨다운(초)
+    const [cooldown, setCooldown] = useState(0);
+    const [showAddressModal, setShowAddressModal] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const cooldownRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 주소 검색 모달 상태
-    const [showAddressModal, setShowAddressModal] = useState(false);
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
-    const set = (k: keyof User, v: string) => {
+    const set = (k: keyof ProfileForm, v: string) => {
         if (k === 'email') {
             // 이메일이 바뀌면 인증 초기화
             setEmailVerified(false);
@@ -77,21 +66,104 @@ export default function SignUpScreen() {
         setForm(prev => ({ ...prev, [k]: v }));
     };
 
-    const emailRegex =
-        /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    const openAddressSearch = () => setShowAddressModal(true);
 
-    // 유효성 검사는 onSubmit에서 Alert로 처리
+    const handleAddressSelect = (data: any) => {
+        let baseAddress = data.address;
+        let extraAddress = '';
+
+        if (data.addressType === 'R') {
+            if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+                extraAddress += data.bname;
+            }
+            if (data.buildingName !== '' && data.apartment === 'Y') {
+                extraAddress += (extraAddress !== '' ? `, ${data.buildingName}` : data.buildingName);
+            }
+            if (extraAddress !== '') {
+                extraAddress = ` (${extraAddress})`;
+            }
+            baseAddress += extraAddress;
+        }
+
+        setForm(prev => ({
+            ...prev,
+            zipCode: data.zonecode,
+            baseAddress: baseAddress,
+            detailAddress: '' // 상세주소는 초기화
+        }));
+        setShowAddressModal(false);
+    };
 
     // 전화번호 입력 핸들러
     const handlePhoneInput = (field: 'phone2' | 'phone3', value: string) => {
         const digits = value.replace(/\D/g, '');
-        console.log(`🔢 전화번호 입력: ${field} = "${digits}" (원본: "${value}")`);
-        setForm(prev => {
-            const newForm = { ...prev, [field]: digits };
-            console.log(`📱 폼 업데이트 후: phone2="${newForm.phone2}", phone3="${newForm.phone3}"`);
-            console.log(`📱 전체 폼 상태:`, newForm);
-            return newForm;
-        });
+        setForm(prev => ({ ...prev, [field]: digits }));
+    };
+
+    const onSave = async () => {
+        // 기관명 유효성 검사
+        if (!form.name.trim()) {
+            Alert.alert('확인', '기관명을 입력하세요.');
+            return;
+        }
+        // 주소 유효성 검사
+        if (!form.zipCode.trim()) {
+            Alert.alert('확인', '우편번호를 검색해주세요.');
+            return;
+        }
+        if (!form.baseAddress.trim()) {
+            Alert.alert('확인', '기본주소를 검색해주세요.');
+            return;
+        }
+        if (!form.detailAddress.trim()) {
+            Alert.alert('확인', '상세주소를 입력하세요.');
+            return;
+        }
+
+        // 이메일 유효성 검사
+        if (!emailRegex.test(form.email)) {
+            Alert.alert('확인', '올바른 이메일을 입력하세요.');
+            return;
+        }
+
+        // 전화번호 유효성 검사
+        if (!form.phone2.trim()) {
+            Alert.alert('확인', '전화번호를 입력하세요.');
+            return;
+        }
+        if (!form.phone3.trim()) {
+            Alert.alert('확인', '전화번호를 입력하세요.');
+            return;
+        }
+
+        // 이메일 인증 검사
+        if (!emailVerified) {
+            Alert.alert('확인', '이메일 인증을 완료해주세요.');
+            return;
+        }
+
+        try {
+            setSubmitting(true);
+            const fullAddress = `${form.baseAddress} ${form.detailAddress}`.trim();
+            const fullPhone = form.phone1 + "-" + form.phone2 + "-" + form.phone3;
+
+            // TODO: API 연동해 실제 저장 처리
+            // await api.put('/user/profile', {
+            //     name: form.name.trim(),
+            //     email: form.email.trim(),
+            //     zipCode: form.zipCode.trim(),
+            //     baseAddress: form.baseAddress.trim(),
+            //     detailAddress: form.detailAddress.trim(),
+            //     address: fullAddress,
+            //     phone: fullPhone,
+            // });
+
+            Alert.alert('저장 완료', '프로필이 업데이트되었습니다.');
+        } catch (e: any) {
+            Alert.alert('오류', e?.message ?? '프로필 저장에 실패했습니다.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     // 쿨다운 타이머
@@ -152,132 +224,12 @@ export default function SignUpScreen() {
             return;
         }
         try {
-            // const res = await api.post('/auth/email/verify', {
-            //   email: form.email,
-            //   code: form.emailCode,
-            // });
-            // if (res.data.verified) setEmailVerified(true);
-
             await new Promise(res => setTimeout(res, 500)); // 데모
             setEmailVerified(true);
             Alert.alert('인증 완료', '이메일 인증이 완료되었습니다.');
         } catch (e: any) {
             setEmailVerified(false);
             Alert.alert('오류', e?.message ?? '인증에 실패했습니다.');
-        }
-    };
-
-    // 주소 검색 완료 처리
-    const handleAddressSelect = (data: any) => {
-        let baseAddress = data.address;
-        let extraAddress = '';
-
-        if (data.addressType === 'R') {
-            if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
-                extraAddress += data.bname;
-            }
-            if (data.buildingName !== '' && data.apartment === 'Y') {
-                extraAddress += (extraAddress !== '' ? `, ${data.buildingName}` : data.buildingName);
-            }
-            if (extraAddress !== '') {
-                extraAddress = ` (${extraAddress})`;
-            }
-            baseAddress += extraAddress;
-        }
-
-        setForm(prev => ({ 
-            ...prev, 
-            zipCode: data.zonecode,
-            baseAddress: baseAddress,
-            detailAddress: '' // 상세주소는 초기화
-        }));
-        setShowAddressModal(false);
-    };
-
-    // 주소 검색 모달 열기
-    const openAddressSearch = () => {
-        setShowAddressModal(true);
-    };
-
-    const onSubmit = async () => {
-        // 기관명 유효성 검사
-        if (!form.name.trim()) {
-            Alert.alert('확인', '기관명을 입력하세요.');
-            return;
-        }
-        // 주소 유효성 검사
-        if (!form.zipCode.trim()) {
-            Alert.alert('확인', '우편번호를 검색해주세요.');
-            return;
-        }
-        if (!form.baseAddress.trim()) {
-            Alert.alert('확인', '기본주소를 검색해주세요.');
-            return;
-        }
-        if (!form.detailAddress.trim()) {
-            Alert.alert('확인', '상세주소를 입력하세요.');
-            return;
-        }
-        
-        // 이메일 유효성 검사
-        if (!emailRegex.test(form.email)) {
-            Alert.alert('확인', '올바른 이메일을 입력하세요.');
-            return;
-        }
-        
-        // 비밀번호 유효성 검사
-        if (form.password.length < 8) {
-            Alert.alert('확인', '비밀번호는 8자 이상이어야 합니다.');
-            return;
-        }
-        if (form.verifyPassword !== form.password) {
-            Alert.alert('확인', '비밀번호가 일치하지 않습니다.');
-            return;
-        }
-        
-        // 전화번호 유효성 검사
-        if (!form.phone2.trim()) {
-            Alert.alert('확인', '전화번호를 입력하세요.');
-            return;
-        }
-        if (!form.phone3.trim()) {
-            Alert.alert('확인', '전화번호를 입력하세요.');
-            return;
-        }
-        
-        // 이메일 인증 검사
-        if (!emailVerified) {
-            Alert.alert('확인', '이메일 인증을 완료해주세요.');
-            return;
-        }
-        try {
-            setSubmitting(true);
-            const fullAddress = `${form.baseAddress} ${form.detailAddress}`.trim();
-            const fullPhone = form.phone1 + "-" + form.phone2 + "-" + form.phone3;
-            console.log("fullPhone", fullPhone);
-            console.log("fullAddress", fullAddress);
-            await api.post('/user/join', {
-                email: form.email.trim(),
-                name: form.name.trim(),
-                zipCode: form.zipCode.trim(),
-                baseAddress: form.baseAddress.trim(),
-                detailAddress: form.detailAddress.trim(),
-                address: fullAddress, // 전체 주소도 함께 전송
-                password: form.password,
-                phone: fullPhone, // 전체 전화번호도 함께 전송
-            });
-            // 회원가입 성공 시 알림 후 로그인 페이지로 이동
-            Alert.alert('회원가입 완료', '로그인 페이지로 이동합니다.', [
-                {
-                    text: '확인',
-                    onPress: () => navigation.reset({ index: 0, routes: [{ name: '로그인' }] }),
-                },
-            ]);
-            
-        } catch (e: any) {
-            Alert.alert('오류', e?.message ?? '회원가입에 실패했습니다.');
-        } finally {
-            setSubmitting(false);
         }
     };
 
@@ -296,7 +248,7 @@ export default function SignUpScreen() {
                         {/* 기관주소 섹션 */}
                         <View style={styles.addressSection}>
                             <Text style={styles.inputLabel}>기관주소</Text>
-                            
+
                             {/* 우편번호 */}
                             <View style={{ marginBottom: 16 }}>
                                 <View style={styles.inputWrap}>
@@ -317,7 +269,7 @@ export default function SignUpScreen() {
                                     </View>
                                 </View>
                             </View>
-                            
+
                             {/* 기본주소 */}
                             <View style={{ marginBottom: 16 }}>
                                 <View style={styles.inputWrap}>
@@ -333,7 +285,7 @@ export default function SignUpScreen() {
                                     />
                                 </View>
                             </View>
-                            
+
                             {/* 상세주소 */}
                             <View style={{ marginBottom: 16 }}>
                                 <View style={styles.inputWrap}>
@@ -387,30 +339,6 @@ export default function SignUpScreen() {
                             hintColor={emailVerified ? COLORS.success : undefined}
                         />
 
-                        <LabeledInput
-                            label="비밀번호"
-                            value={form.password}
-                            onChangeText={v => set('password', v)}
-                            placeholder="8자 이상"
-                            secureTextEntry={!showPw}
-                            rightAction={
-                                <TouchableOpacity onPress={() => setShowPw(s => !s)}>
-                                    <Text style={styles.eye}>{showPw ? 'Hide' : 'Show'}</Text>
-                                </TouchableOpacity>
-                            }
-                        />
-                        <LabeledInput
-                            label="비밀번호 확인"
-                            value={form.verifyPassword}
-                            onChangeText={v => set('verifyPassword', v)}
-                            placeholder="비밀번호 재입력"
-                            secureTextEntry={!showPw2}
-                            rightAction={
-                                <TouchableOpacity onPress={() => setShowPw2(s => !s)}>
-                                    <Text style={styles.eye}>{showPw2 ? 'Hide' : 'Show'}</Text>
-                                </TouchableOpacity>
-                            }
-                        />
                         {/* 전화번호 */}
                         <View style={styles.phoneSection}>
                             <Text style={styles.inputLabel}>담당자 전화번호</Text>
@@ -468,7 +396,7 @@ export default function SignUpScreen() {
                         </View>
 
                         <Pressable
-                            onPress={onSubmit}
+                            onPress={onSave}
                             disabled={submitting}
                             style={({ pressed }) => [
                                 styles.button,
@@ -476,12 +404,8 @@ export default function SignUpScreen() {
                                 pressed && { transform: [{ scale: 0.99 }] },
                             ]}
                         >
-                            <Text style={styles.buttonText}>{submitting ? '처리 중...' : '회원가입'}</Text>
+                            <Text style={styles.buttonText}>{submitting ? '처리 중...' : '저장'}</Text>
                         </Pressable>
-
-                        {/* <Text style={styles.helper}>
-                            이미 계정이 있나요? <Text style={[styles.helper, { color: COLORS.primary }]}>Sign In</Text>
-                        </Text> */}
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -502,7 +426,7 @@ export default function SignUpScreen() {
                     </View>
                     <DaumPostcode
                         style={{ flex: 1 }}
-                        jsOptions={{ 
+                        jsOptions={{
                             animation: false,  // 애니메이션 비활성화로 성능 향상
                             hideMapBtn: true,   // 지도 버튼 숨김으로 로딩 시간 단축
                             hideEngBtn: true,   // 영문 버튼 숨김
@@ -611,15 +535,15 @@ const styles = StyleSheet.create({
     addressSection: { marginBottom: 16 },
     // 전화번호 관련 스타일
     phoneSection: { marginBottom: 16 },
-    phoneRow: { 
-        flexDirection: 'row', 
+    phoneRow: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between'
     },
     phoneField: { flex: 1 },
-    phoneDash: { 
-        fontSize: 18, 
-        fontWeight: '600', 
+    phoneDash: {
+        fontSize: 18,
+        fontWeight: '600',
         color: COLORS.hint,
         marginHorizontal: 4
     },

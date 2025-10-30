@@ -5,7 +5,7 @@ import { useTailingData } from '../contexts/TailingDataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList } from '../../AppInner';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import api from '../constant/contants';
 import { RootState } from '../store/reducer';

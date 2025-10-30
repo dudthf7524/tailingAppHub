@@ -6,6 +6,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { removeToken } from '../utils/token';
+import EncryptedStorage from 'react-native-encrypted-storage';
+import { useAppDispatch } from '../store';
+import userSlice from '../slices/user';
 
 const decodeJWT = (token: string) => {
     try {
@@ -29,6 +32,7 @@ const COLORS = {
 };
 
 export default function Profile({ navigation }: any) {
+    const dispatch = useAppDispatch();
     const [userInfo, setUserInfo] = useState({
         email: '',
         orgName: '',
@@ -78,9 +82,11 @@ export default function Profile({ navigation }: any) {
                         try {
                             setLoading(true);
                             // AsyncStorage에서 토큰 삭제
-                            await removeToken();
-                            await AsyncStorage.removeItem('accessToken'); // 기존 accessToken도 삭제
-                            
+                            // await removeToken();
+                            // await AsyncStorage.removeItem('accessToken'); // 기존 accessToken도 삭제
+                            await EncryptedStorage.removeItem('refreshToken');
+                            dispatch(userSlice.actions.setUser({ id: '', email: '', accessToken: '' }));
+
                             console.log('로그아웃 완료');
                             
                             Alert.alert('로그아웃 완료', '다시 로그인해주세요.', [
@@ -135,7 +141,7 @@ export default function Profile({ navigation }: any) {
                 </View>
                 
                 <View style={styles.menuContainer}>
-                    <TouchableOpacity style={styles.menuItem}>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('ProfileEdit')}>
                         <View style={styles.menuLeft}>
                             <View style={styles.menuIconContainer}>
                                 <Ionicons name="person-outline" size={20} color={COLORS.primary} />
@@ -154,6 +160,19 @@ export default function Profile({ navigation }: any) {
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
                     </TouchableOpacity>
+{/* 
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => navigation.navigate('CSVDownload')}
+                    >
+                        <View style={styles.menuLeft}>
+                            <View style={styles.menuIconContainer}>
+                                <Ionicons name="download-outline" size={20} color={COLORS.primary} />
+                            </View>
+                            <Text style={styles.menuText}>CSV 파일 다운로드</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
+                    </TouchableOpacity> */}
 
                     {/* <TouchableOpacity style={styles.menuItem}>
                         <View style={styles.menuLeft}>
@@ -207,12 +226,12 @@ const styles = StyleSheet.create({
         marginTop: 16,
         marginBottom: 16,
         padding: 20,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 3,
+        // borderRadius: 16,
+        // shadowColor: '#000',
+        // shadowOpacity: 0.06,
+        // shadowRadius: 12,
+        // shadowOffset: { width: 0, height: 6 },
+        // elevation: 3,
         flex: 1,
     },
     sectionTitle: {
