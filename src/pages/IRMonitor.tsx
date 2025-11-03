@@ -25,11 +25,25 @@ const screenWidth = Dimensions.get('window').width;
 const IRMonitor = () => {
     const route = useRoute();
     const { deviceId, deviceName } = route.params as { deviceId: string; deviceName: string };
-    const { tailingData } = useTailingData();
-    
+    console.log(deviceId)
+    const { rawWebSocketData } = useTailingData();
+
     const [data, setData] = useState<IRDataPoint[]>([]);
     const [isAutoScrolling, setIsAutoScrolling] = useState(true);
     const scrollViewRef = useRef<ScrollView>(null);
+
+    // 0이 아닌 마지막 값들을 저장
+    const [lastValidHr, setLastValidHr] = useState<number>(0);
+    const [lastValidSpo2, setLastValidSpo2] = useState<number>(0);
+    const [lastValidTemp, setLastValidTemp] = useState<number>(0);
+    const [lastValidBattery, setLastValidBattery] = useState<number>(0);
+    // console.log("rawWebSocketData : ", rawWebSocketData)
+    // console.log('=== IRMonitor 디버깅 ===');
+    // console.log('deviceId:', deviceId);
+    // console.log('rawWebSocketData?.deviceAddress:', rawWebSocketData?.deviceAddress);
+    // console.log('주소 일치?:', deviceId === rawWebSocketData?.deviceAddress);
+    // console.log("data 길이:", data.length);
+    // console.log("isAutoScrolling:", isAutoScrolling);
 
     const pointsPerView = 100;
     const pointWidth = screenWidth / pointsPerView;
@@ -54,7 +68,7 @@ const IRMonitor = () => {
 
         const min = Math.min(...values);
         const max = Math.max(...values);
-        
+
         if (min === max) {
             return { min: Math.max(0, min - 1000), max: max + 1000 };
         }
@@ -68,46 +82,82 @@ const IRMonitor = () => {
 
     const [hrData, setHrData] = useState<IRDataPoint[]>([]);
     const [spo2Data, setSpo2Data] = useState<IRDataPoint[]>([]);
+    const [tempData, setTempData] = useState<IRDataPoint[]>([]);
+    const [batteryData, setBatteryData] = useState<IRDataPoint[]>([]);
 
     // IR 데이터를 그래프 데이터로 변환 (1초마다)
     useEffect(() => {
         try {
-            const dataList = tailingData[deviceId] || [];
-            
-            if (!isAutoScrolling || !dataList || dataList.length === 0) return;
-            
-            // IR 값 추출
-            const irValues = dataList
-                .filter(item => typeof item.ir === 'number' && !isNaN(item.ir) && isFinite(item.ir))
-                .map(item => item.ir);
-            
-            if (irValues.length === 0) return;
-            
-            // 데이터 포인트 수를 줄임
-            const step = Math.max(1, Math.floor(irValues.length / 100));
-            
-            const newIrPoints: IRDataPoint[] = irValues
-                .filter((_, index) => index % step === 0)
-                .map((value, index) => ({
-                    timestamp: Date.now() + index * 20,
-                    value: value
-                }));
-            
-            setData(prevData => {
-                const updatedData = [...prevData, ...newIrPoints];
-                return updatedData.slice(-100);
-            });
+            // rawWebSocketData에서 데이터 가져오기
+            let dataList: any[] = [];
+
+            // rawWebSocketData가 배열인지 확인하고 deviceAddress 찾기
+            if (Array.isArray(rawWebSocketData)) {
+                // 배열에서 현재 deviceId와 일치하는 항목 찾기
+                const matchedData = rawWebSocketData.find((item: any) => item.deviceAddress === deviceId);
+                console.log("matchedData : ", matchedData)
+                if (matchedData && matchedData.deviceData) {
+                    dataList = matchedData.deviceData;
+                    console.log('📊 배열에서 디바이스 찾음:', deviceId, '데이터:', dataList.length, '개');
+                }
+            } else if (rawWebSocketData && rawWebSocketData.deviceAddress === deviceId && rawWebSocketData.deviceData) {
+                // 단일 객체인 경우
+                dataList = rawWebSocketData.deviceData;
+                console.log('📊 단일 객체에서 데이터 사용:', dataList.length, '개');
+            }
+
+            if (!dataList || dataList.length === 0) {
+                console.log('⚠️ 데이터 없음');
+                return;
+            }
+
+            // IR 그래프 갱신은 자동 스크롤일 때만 수행
+            if (isAutoScrolling) {
+                const irValues = dataList
+                    .map(item => Number(item.ir))
+                    .filter(value => !isNaN(value) && isFinite(value));
+
+                console.log('📊 IR 값 추출:', irValues.length, '개');
+
+                if (irValues.length > 0) {
+                    const step = Math.max(1, Math.floor(irValues.length / 100));
+                    const newIrPoints: IRDataPoint[] = irValues
+                        .filter((_, index) => index % step === 0)
+                        .map((value, index) => ({
+                            timestamp: Date.now() + index * 20,
+                            value: value
+                        }));
+
+                    setData(prevData => {
+                        const updatedData = [...prevData, ...newIrPoints];
+                        return updatedData.slice(-100);
+                    });
+                }
+            }
 
             const hrValues = dataList
-                .filter(item => typeof item.hr === 'number' && !isNaN(item.hr) && isFinite(item.hr))
-                .map(item => item.hr);
-            
+                .map(item => Number(item.hr))
+                .filter(value => !isNaN(value) && isFinite(value) && value > 0);
+            console.log("hrValues(>0) : ", hrValues)
+
             const spo2Values = dataList
-                .filter(item => typeof item.spo2 === 'number' && !isNaN(item.spo2) && isFinite(item.spo2))
-                .map(item => item.spo2);
-            
-            if (hrValues.length > 0) {
-                const lastHrValue = hrValues[hrValues.length - 1];
+                .map(item => Number(item.spo2))
+                .filter(value => !isNaN(value) && isFinite(value) && value > 0);
+            console.log("spo2Values(>0) : ", spo2Values)
+
+            const tempValues = dataList
+                .map(item => Number(item.temp))
+                .filter(value => !isNaN(value) && isFinite(value) && value > 0);
+            console.log("tempValues(>0) : ", tempValues)
+
+            const batteryValues = dataList
+                .map(item => Number(item.battery))
+                .filter(value => !isNaN(value) && isFinite(value) && value > 0);
+            console.log("batteryValues(>0) : ", batteryValues)
+
+            if (hrValues[0] > 0) {
+                const lastHrValue = hrValues[0];
+                setLastValidHr(lastHrValue);
                 setHrData(prevData => {
                     const newPoint: IRDataPoint = {
                         timestamp: Date.now(),
@@ -117,9 +167,10 @@ const IRMonitor = () => {
                     return updatedData.slice(-100);
                 });
             }
-            
-            if (spo2Values.length > 0) {
-                const lastSpo2Value = spo2Values[spo2Values.length - 1];
+
+            if (spo2Values[0] > 0) {
+                const lastSpo2Value = spo2Values[0];
+                setLastValidSpo2(lastSpo2Value);
                 setSpo2Data(prevData => {
                     const newPoint: IRDataPoint = {
                         timestamp: Date.now(),
@@ -129,61 +180,37 @@ const IRMonitor = () => {
                     return updatedData.slice(-100);
                 });
             }
+
+            if (tempValues[0] > 0) {
+                const lastTempValue = tempValues[0];
+                setLastValidTemp(lastTempValue);
+                setTempData(prevData => {
+                    const newPoint: IRDataPoint = {
+                        timestamp: Date.now(),
+                        value: lastTempValue
+                    };
+                    const updatedData = [...prevData, newPoint];
+                    return updatedData.slice(-100);
+                });
+            }
+
+            if (batteryValues[0] > 0) {
+                const lastBatteryValue = batteryValues[0];
+                setLastValidBattery(lastBatteryValue);
+                setBatteryData(prevData => {
+                    const newPoint: IRDataPoint = {
+                        timestamp: Date.now(),
+                        value: lastBatteryValue
+                    };
+                    const updatedData = [...prevData, newPoint];
+                    return updatedData.slice(-100);
+                });
+            }
         } catch (error) {
             console.error('Error processing IR data:', error);
         }
-    }, [deviceId, tailingData, isAutoScrolling]);
+    }, [deviceId, rawWebSocketData, isAutoScrolling]);
 
-    // HR, SPO2 데이터 업데이트 (4초마다)
-    useEffect(() => {
-        const interval = setInterval(() => {
-            try {
-                const dataList = tailingData[deviceId] || [];
-                console.log("aaaaaaaaaaaaa")
-                
-                if (!dataList || dataList.length === 0) return;
-                
-                const hrValues = dataList
-                    .filter(item => typeof item.hr === 'number' && !isNaN(item.hr) && isFinite(item.hr))
-                    .map(item => item.hr);
-                    console.log("hrValues", hrValues)
-                
-                const spo2Values = dataList
-                    .filter(item => typeof item.spo2 === 'number' && !isNaN(item.spo2) && isFinite(item.spo2))
-                    .map(item => item.spo2);
-                
-                if (hrValues.length > 0) {
-                    const lastHrValue = hrValues[hrValues.length - 1];
-                    setHrData(prevData => {
-                        const newPoint: IRDataPoint = {
-                            timestamp: Date.now(),
-                            value: lastHrValue
-                        };
-                        const updatedData = [...prevData, newPoint];
-                        return updatedData.slice(-100);
-                    });
-                }
-                
-                if (spo2Values.length > 0) {
-                    const lastSpo2Value = spo2Values[spo2Values.length - 1];
-                    setSpo2Data(prevData => {
-                        const newPoint: IRDataPoint = {
-                            timestamp: Date.now(),
-                            value: lastSpo2Value
-                        };
-                        const updatedData = [...prevData, newPoint];
-                        return updatedData.slice(-100);
-                    });
-                }
-            } catch (error) {
-                console.error('Error processing HR/SPO2 data:', error);
-            }
-        }, 4000); // 4초마다
-        
-        return () => clearInterval(interval);
-    }, [deviceId, tailingData]);
-
-    // 자동 스크롤
     useEffect(() => {
         if (!isAutoScrolling) return;
 
@@ -203,7 +230,7 @@ const IRMonitor = () => {
         if (range <= 0) return ['0', '5000', '10000', '15000', '20000'];
 
         const step = range / 4;
-        return Array.from({ length: 5 }, (_, i) => 
+        return Array.from({ length: 5 }, (_, i) =>
             Math.round(min + step * i).toString()
         ).reverse();
     };
@@ -211,16 +238,16 @@ const IRMonitor = () => {
     // X축 레이블 생성 (시간을 0,1,2,3으로)
     const getXLabels = () => {
         if (!data || data.length === 0) return [];
-        
+
         // 그래프 전체 너비에서 0, 1/3, 2/3, 끝 지점에 레이블 배치
         const graphWidthTotal = chartWidth - padding;
         const positions = [
             padding + 50,  // 0: 더 오른쪽으로
-            padding + graphWidthTotal / 3, 
-            padding + (graphWidthTotal * 2) / 3, 
+            padding + graphWidthTotal / 3,
+            padding + (graphWidthTotal * 2) / 3,
             chartWidth - 20
         ];
-        
+
         return [0, 1, 2, 3].map((label, i) => ({
             x: positions[i],
             time: label.toString()
@@ -231,10 +258,10 @@ const IRMonitor = () => {
     const createPath = () => {
         try {
             if (!data || data.length === 0) return '';
-            
+
             const { min, max } = getYAxisRange();
             const range = max - min;
-            
+
             if (range <= 0) return '';
 
             // 데이터 포인트 수를 줄임 (모든 포인트를 사용하지 않고 일부만 사용)
@@ -257,7 +284,6 @@ const IRMonitor = () => {
 
     const yLabels = getYLabels();
     const xLabels = getXLabels();
-    const lastData = tailingData[deviceId]?.[tailingData[deviceId].length - 1];
 
     if (data.length === 0) {
         return (
@@ -271,11 +297,16 @@ const IRMonitor = () => {
     const maxValue = data.length > 0 ? Math.max(...data.map(p => p.value)) : 0;
     const avgValue = data.length > 0 ? data.map(p => p.value).reduce((a, b) => a + b, 0) / data.length : 0;
 
-    const currentHr = hrData.length > 0 ? hrData[hrData.length - 1]?.value : 0;
-    const currentSpo2 = spo2Data.length > 0 ? spo2Data[spo2Data.length - 1]?.value : 0;
-    const currentTemp = lastData?.temp || 0;
-    const batteryLevel = lastData?.battery || 0;
-
+    // 0이 아닌 마지막 유효 값을 사용
+    const currentHr = lastValidHr || (hrData.length > 0 ? hrData[hrData.length - 1]?.value : 0);
+    // console.log("lastValidHr : ", lastValidHr)
+    // console.log("currentHr : ", currentHr);
+    const currentSpo2 = lastValidSpo2 || (spo2Data.length > 0 ? spo2Data[spo2Data.length - 1]?.value : 0);
+    const currentTemp = lastValidTemp || (tempData.length > 0 ? tempData[tempData.length - 1]?.value : 0);
+    const batteryLevel = lastValidBattery || (batteryData.length > 0 ? batteryData[batteryData.length - 1]?.value : 0);
+    // console.log("currentSpo2 : ", currentSpo2);
+    // console.log("currentTemp : ", currentTemp);
+    // console.log("batteryLevel : ", batteryLevel);
     // 배터리 아이콘 선택
     const getBatteryIcon = (level: number) => {
         if (level >= 75) return 'battery-full';
@@ -297,17 +328,17 @@ const IRMonitor = () => {
                 <View style={styles.headerTop}>
                     <Text style={styles.title}>{deviceName}</Text>
                     <View style={styles.batteryContainer}>
-                        <Ionicons 
-                            name={getBatteryIcon(batteryLevel)} 
-                            size={20} 
-                            color={getBatteryColor(batteryLevel)} 
+                        <Ionicons
+                            name={getBatteryIcon(batteryLevel)}
+                            size={20}
+                            color={getBatteryColor(batteryLevel)}
                         />
                         <Text style={styles.batteryText}>{batteryLevel}%</Text>
                     </View>
                 </View>
             </View>
 
-           
+
             <View style={styles.chartCard}>
                 <Text style={styles.chartTitle}>IR 신호 그래프</Text>
                 <View style={styles.chartWrapper}>
@@ -318,9 +349,9 @@ const IRMonitor = () => {
                             </Text>
                         ))}
                     </View>
-                    <ScrollView 
+                    <ScrollView
                         ref={scrollViewRef}
-                        horizontal 
+                        horizontal
                         showsHorizontalScrollIndicator={false}
                         style={styles.graphContainer}
                     >
@@ -337,7 +368,7 @@ const IRMonitor = () => {
                                     strokeWidth="1"
                                 />
                             ))}
-                            
+
                             {/* 데이터 라인 */}
                             {data.length > 0 && (
                                 <Path
@@ -350,7 +381,7 @@ const IRMonitor = () => {
                         </Svg>
                     </ScrollView>
                 </View>
-                
+
                 {/* X축 레이블을 SVG 바깥에 표시 */}
                 <View style={styles.xAxisLabelContainer}>
                     <Text style={styles.xAxisLabelText}>0</Text>
@@ -361,8 +392,8 @@ const IRMonitor = () => {
                     <View style={{ flex: 1 }} />
                     <Text style={styles.xAxisLabelText}>3</Text>
                 </View>
-                <TouchableOpacity 
-                    style={styles.playButton} 
+                <TouchableOpacity
+                    style={styles.playButton}
                     onPress={() => setIsAutoScrolling(!isAutoScrolling)}
                 >
                     <Text style={styles.playButtonText}>

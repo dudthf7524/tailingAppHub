@@ -63,6 +63,7 @@ export default function SignInScreen({ navigation }: any) {
                 email: email,
                 password: password
             });
+            console.log(response)
 
             if (response.status === 401) {
                 Alert.alert('로그인 실패', response.data.message);
@@ -72,7 +73,6 @@ export default function SignInScreen({ navigation }: any) {
 
                 dispatch(
                     userSlice.actions.setUser({
-                        id: response.data.data.id,
                         email: response.data.data.email,
                         accessToken: response.data.data.accessToken,
                     }),
@@ -131,8 +131,8 @@ export default function SignInScreen({ navigation }: any) {
                 <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" scrollEnabled={false}>
                     {/* 헤더 */}
                     <View style={styles.header}>
-                        <Text style={styles.brand}>Tailing</Text>
-                        <Text style={styles.subtitle}>반려동물 의료 모니터링 시스템</Text>
+                        <Text style={styles.brand}>Talktail</Text>
+                        <Text style={styles.subtitle}>환축모니터링 솔루션</Text>
                     </View>
 
                     {/* 로그인 카드 */}

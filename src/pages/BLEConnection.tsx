@@ -47,14 +47,19 @@ export default function BLEConnection() {
     const [isProcessingWifiResponse, setIsProcessingWifiResponse] = useState(false);
     const [deviceMTU, setDeviceMTU] = useState<Map<string, number>>(new Map());
     const email = useSelector((state: RootState) => state.user.email);
-console.log("email : " ,email);
+
+    // 화면에 들어올 때마다 email 출력
+    useEffect(() => {
+        console.log("email : ", email);
+    }, [email]);
+
     const sendTextToESP32 = async (deviceId: string, text: string): Promise<boolean> => {
         try {
             console.log('📤 ESP32로 전송할 데이터:', text);
             console.log('📤 Device ID:', deviceId);
-
+            console.log("email : ", email);
             const texta = "s:" + text + email;
-            
+
             console.log('📤 ESP32로 전송할 데이터:', texta);
 
             // 문자열을 UTF-8 바이트 배열로 변환 (버퍼 사용)
@@ -67,36 +72,36 @@ console.log("email : " ,email);
             // 협상된 MTU를 가져오거나 기본값 20바이트 사용
             const maxChunkSize = deviceMTU.get(deviceId) || 20;
             console.log('📏 사용 가능한 청크 크기:', maxChunkSize);
-            
+
             // BLE 순차 전송하여 데이터가 정확히 전달되도록 함
             const CHUNK_SIZE = maxChunkSize;
             const totalChunks = Math.ceil(textBytes.length / CHUNK_SIZE);
-            
+
             console.log(`📤 총 ${totalChunks}개 청크로 나누어 순차 전송합니다 (청크 크기: ${CHUNK_SIZE} bytes)`);
-            
+
             // 마지막 청크가 17바이트 초과인지 추적
             let shouldSendEndMarker = false;
-            
+
             // 순차적으로 전송 (각 청크가 완전히 전송될 때까지 대기)
             for (let i = 0; i < totalChunks; i++) {
                 const start = i * CHUNK_SIZE;
                 const end = Math.min(start + CHUNK_SIZE, textBytes.length);
                 const chunk = textBytes.slice(start, end);
-                
+
                 // 마지막 청크인지 확인
                 console.log("i : ", i);
                 console.log("totalChunks : ", totalChunks);
                 console.log("chunk.length : ", chunk.length);
-                
+
                 let finalChunk = chunk;
-                
+
                 if (i === totalChunks - 1) {
                     // 마지막 청크인 경우
                     const endMarker = Buffer.from("e:", 'utf-8');
                     const endBytes = Array.from(endMarker);
-                    
+
                     console.log("endBytes.length : ", endBytes.length);
-                    
+
                     // 마지막 청크가 17바이트 이하인 경우만 "e:"를 붙임
                     if (chunk.length <= 17) {
                         // "e:"를 앞에 붙임
@@ -106,7 +111,7 @@ console.log("email : " ,email);
                         shouldSendEndMarker = true;
                         console.log("❌ 마지막 청크가 17바이트 초과 - e: 별도 전송 예정");
                     }
-                    
+
                     // 바이트 배열을 문자열로 변환하여 출력
                     const chunkString = Buffer.from(finalChunk).toString('utf-8');
                     console.log(`📦 마지막 청크 전송 중... (${finalChunk.length} bytes)`);
@@ -117,7 +122,7 @@ console.log("email : " ,email);
                     console.log(`📦 청크 ${i + 1}/${totalChunks} 전송 중... (${chunk.length} bytes)`);
                     console.log(`📝 청크 내용: "${chunkString}"`);
                 }
-                
+
                 // 각 청크를 순차적으로 전송하고 완료될 때까지 대기
                 await BleManager.write(
                     deviceId,
@@ -125,21 +130,21 @@ console.log("email : " ,email);
                     CHARACTERISTIC_UUID_TX,
                     finalChunk
                 );
-                
+
                 // 각 전송 사이에 짧은 지연 (BLE 스택이 안정적으로 처리할 수 있도록)
                 if (i < totalChunks - 1) {
                     await new Promise(resolve => setTimeout(resolve, 2));
                 }
             }
-            
+
             // 마지막 청크가 17바이트 초과였던 경우 별도로 "e:" 전송
             if (shouldSendEndMarker) {
                 const endMarker = Buffer.from("e:", 'utf-8');
                 const endBytes = Array.from(endMarker);
-                
+
                 console.log('📦 마지막으로 "e:" 마커 전송 중...');
                 console.log(`📝 마커 내용: "${Buffer.from(endBytes).toString('utf-8')}"`);
-                
+
                 await BleManager.write(
                     deviceId,
                     SERVICE_UUID,

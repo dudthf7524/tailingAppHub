@@ -25,18 +25,25 @@ const COLORS = {
 };
 
 const TailingDeviceList = () => {
-    const { tailingData } = useTailingData();
-    // console.log("taling", tailingData)
+    const { rawWebSocketData } = useTailingData();
+
     const navigation = useNavigation<Nav>();
     const route = useRoute<NativeStackScreenProps<RootStackParamList, 'TailingDeviceList'>['route']>();
     const [deviceKeys, setDeviceKeys] = useState<string[]>([]);
     const [deviceList, setDeviceList] = useState<any[]>([]);
     const [devicePetConnections, setDevicePetConnections] = useState<Record<string, any>>({});
 
+    // console.log("=== 디버깅 ===");
+    // console.log("웹소켓 원본 데이터 타입:", typeof rawWebSocketData);
+    // console.log("웹소켓 원본 데이터 배열?:", Array.isArray(rawWebSocketData));
+    // console.log("웹소켓 원본 데이터:", rawWebSocketData);
+    // console.log("deviceKeys:", deviceKeys);
+    // console.log("deviceList:", deviceList);
+
     const accessToken = useSelector((state: RootState) => state.user.accessToken);
 
     // 허브 정보 가져오기
-    const hubId = route.params?.hubId;
+    const hubAddress = route.params?.hubAddress;
     const hubName = route.params?.hubName;
 
     // 미등록 행의 입력값 관리: { [mac]: name }
@@ -52,17 +59,55 @@ const TailingDeviceList = () => {
     // console.log("deviceList", deviceList)
 
     useEffect(() => {
-        setDeviceKeys(Object.keys(tailingData));
-    }, [tailingData]);
+        console.log('🔍 useEffect 실행 - rawWebSocketData:', rawWebSocketData);
+
+        if (!rawWebSocketData) {
+            console.log('⚠️ rawWebSocketData가 null/undefined');
+            return;
+        }
+
+        // 배열인 경우 첫 번째 요소 확인
+        let data = rawWebSocketData;
+        if (Array.isArray(rawWebSocketData)) {
+            // console.log('📦 배열로 받음, 길이:', rawWebSocketData.length);
+            data = rawWebSocketData[0]; // 첫 번째 요소
+        }
+
+        // console.log('🔍 처리할 데이터:', data);
+
+        // deviceAddress 추출
+        const deviceAddress = data?.deviceAddress;
+        // console.log('🔍 추출한 deviceAddress:', deviceAddress);
+
+        if (deviceAddress) {
+            // console.log('📡 웹소켓에서 디바이스 주소 수신:', deviceAddress);
+
+            setDeviceKeys(prev => {
+                if (!prev.includes(deviceAddress)) {
+                    // console.log('✅ deviceKeys에 추가:', deviceAddress);
+                    return [...prev, deviceAddress];
+                }
+                // console.log('⚠️ 이미 존재하는 디바이스:', deviceAddress);
+                return prev;
+            });
+        } else {
+            console.log('❌ deviceAddress를 찾을 수 없음');
+        }
+    }, [rawWebSocketData]);
 
 
 
     const fetchList = async () => {
         try {
-            const result = await api.get(`/device/list`, {
+            // 허브 주소가 있으면 쿼리 파라미터로 추가
+            const url = hubAddress 
+                ? `/device/list?hubAddress=${encodeURIComponent(hubAddress)}`
+                : `/device/list`;
+            
+            const result = await api.get(url, {
                 headers: { authorization: `Bearer ${accessToken}` },
             });
-            console.log("result", result);
+            // console.log("result", result);
             if (Array.isArray(result.data.data)) {
                 setDeviceList(result.data.data);
             }
@@ -79,8 +124,8 @@ const TailingDeviceList = () => {
             const result = await api.get(`/device/connect/pet/list`, {
                 headers: { authorization: `${accessToken}` },
             });
-            console.log("device pet connections", result);
-            console.log("result : ", result.data.data);
+            // console.log("device pet connections", result);
+            // console.log("result : ", result.data.data);
 
             if (Array.isArray(result.data.data)) {
                 // 배열을 MAC 주소를 key로 하는 객체로 변환
@@ -99,7 +144,7 @@ const TailingDeviceList = () => {
     useEffect(() => {
         fetchList();
         fetchDevicePetConnections();
-    }, []);
+    }, [hubAddress]);
 
     // DB 리스트를 빠르게 조회하기 위한 맵
     const deviceMap = useMemo(() => {
@@ -125,7 +170,7 @@ const TailingDeviceList = () => {
             await api.post('/device/register', {
                 address: mac,
                 name: name,
-                hubId: hubId, // 허브 ID 추가
+                hubAddress: hubAddress, // 허브 ID 추가
             }, {
                 headers: { authorization: `Bearer ${accessToken}` },
             });
@@ -148,6 +193,7 @@ const TailingDeviceList = () => {
 
     // 펫 선택 모달 열기
     const handleOpenPetSelect = (deviceId: string, deviceName: string, deviceDbId: string) => {
+        console.log(deviceId)
         setSelectedDeviceId(deviceId);
         setSelectedDeviceName(deviceName);
         setSelectedDeviceDbId(deviceDbId);
@@ -159,7 +205,7 @@ const TailingDeviceList = () => {
         try {
             // 디바이스와 펫 연결 API 호출 - DB ID 사용
             await api.post('/device/connect/pet', {
-                deviceId: selectedDeviceDbId, // DB에서 가져온 실제 디바이스 ID 사용
+                deviceAddress: selectedDeviceId, // DB에서 가져온 실제 디바이스 ID 사용
                 petId: pet.id,
             }, {
                 headers: { authorization: `Bearer ${accessToken}` },
@@ -178,15 +224,6 @@ const TailingDeviceList = () => {
     return (
         <View style={styles.container}>
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
-                    {hubName ? `${hubName} - ` : ''}연결된 디바이스 ({deviceKeys.length}) / 등록된 디바이스 ({deviceList.length})
-                </Text>
-                {hubId && (
-                    <Text style={styles.hubInfo}>
-                        허브 ID: {hubId}
-                    </Text>
-                )}
-
                 {deviceKeys.length === 0 && deviceList.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Ionicons name="phone-portrait-outline" size={48} color={COLORS.hint} />
@@ -220,7 +257,6 @@ const TailingDeviceList = () => {
                                                 />
                                             )}
                                         </View>
-                                        <Text style={styles.deviceId}>MAC: {mac}</Text>
                                     </View>
 
                                     {isRegistered ? (
@@ -320,12 +356,6 @@ const styles = StyleSheet.create({
         margin: 16,
         marginTop: 16,
         padding: 20,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 3,
         flex: 1,
     },
     sectionTitle: {

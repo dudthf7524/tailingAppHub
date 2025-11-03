@@ -13,6 +13,9 @@ import TailingDashBoard from "./src/pages/TailingDashBoard";
 import CustomerService from "./src/pages/CustomerService";
 import PrivacyPolicy from "./src/pages/PrivacyPolicy";
 import CSVDownload from "./src/pages/CSVDownload";
+import UserDetail from "./src/pages/UserDetail";
+import HubNameEdit from "./src/pages/HubNameEdit";
+import DeviceNameEdit from "./src/pages/DeviceNameEdit";
 import Login from "./src/pages/Login";
 import Join from "./src/pages/Join";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -24,7 +27,7 @@ import axios from "axios";
 import EncryptedStorage from "react-native-encrypted-storage";
 import userSlice from "./src/slices/user";
 import api from "./src/constant/contants";
-import { Alert, View, Text, ActivityIndicator, StyleSheet, Animated } from "react-native";
+import { Alert, View, Text, ActivityIndicator, StyleSheet, Animated, TouchableOpacity } from "react-native";
 import BootSplash from "react-native-bootsplash";
 
 const Tab = createBottomTabNavigator();
@@ -76,19 +79,30 @@ function MainTabs() {
                 name="PetList"
                 component={PetList}
                 options={{
-                    title: '펫 목록',
+                    title: '환자 리스트',
                     tabBarIcon: ({ color, size }) => (
                         <Ionicons name="paw" size={size} color={color} />
                     ),
                 }}
             />
+            {/* <Tab.Screen
+                name="CSVDownload"
+                component={CSVDownload}
+                options={{
+                    title: 'CSV 다운로드',
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="download-outline" size={size} color={color} />
+                    ),
+                }}
+            /> */}
             <Tab.Screen
                 name="Profile"
                 component={Profile}
                 options={{
-                    title: '내 정보',
+                    title: '더보기',
+                    // headerTitleAlign: 'left',
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="person" size={size} color={color} />
+                        <Ionicons name="ellipsis-horizontal" size={size} color={color} />
                     ),
                 }}
             />
@@ -107,7 +121,7 @@ interface Data {
 }
 export type RootStackParamList = {
     MainTabs: undefined;
-    TailingDeviceList: { hubId?: string; hubName?: string } | undefined;
+    TailingDeviceList: { hubAddress?: string; hubName?: string } | undefined;
     TailingDeviceMonitor: undefined;
     TailingDashBoard: { deviceId: string; deviceName: string };
     TailingData: { screen: string; data: Data } | undefined;
@@ -127,6 +141,9 @@ export type RootStackParamList = {
     CustomerService: undefined;
     PrivacyPolicy: undefined;
     CSVDownload: undefined;
+    UserDetail: undefined;
+    HubNameEdit: undefined;
+    DeviceNameEdit: undefined;
 };
 
 function AppInner() {
@@ -138,7 +155,7 @@ function AppInner() {
     console.log("함수실행중");
     useEffect(() => {
         console.log("실행됨")
-    api.interceptors.response.use(
+        api.interceptors.response.use(
             response => {
                 console.log(response);
                 return response;
@@ -151,7 +168,7 @@ function AppInner() {
                     if (error.response.data.code === 'expired') {
                         const originalRequest = config;
                         const refreshToken = await EncryptedStorage.getItem('refreshToken');
-                        console.log("refreshToken", refreshToken);  
+                        console.log("refreshToken", refreshToken);
                         if (!refreshToken) return;
                         const { data } = await api.post(`/auth/refreshToken`,
                             {},
@@ -180,24 +197,33 @@ function AppInner() {
     }, [dispatch]);
 
     useEffect(() => {
+        const prepare = async () => {
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 2초로 증가
+        };
+        prepare().finally(async () => {
+            await BootSplash.hide({ fade: true });
+        });
+    }, []);
+
+    useEffect(() => {
         const startTime = Date.now();
         const MIN_SPLASH_DURATION = 3000; // 최소 3초
-        
+
         const getTokenAndRefresh = async () => {
             try {
                 const refreshToken = await EncryptedStorage.getItem('refreshToken');
-                if (!refreshToken) {
-                    // 최소 3초 보장 후 BootSplash 숨기기
-                    const elapsed = Date.now() - startTime;
-                    const remaining = Math.max(0, MIN_SPLASH_DURATION - elapsed);
-                    setTimeout(async () => {
-                        await BootSplash.hide({ fade: true });
-                        setAuthLoading(false);
-                    }, remaining);
-                    return;
-                }
+                // if (!refreshToken) {
+                //     // 최소 3초 보장 후 BootSplash 숨기기
+                //     const elapsed = Date.now() - startTime;
+                //     const remaining = Math.max(0, MIN_SPLASH_DURATION - elapsed);
+                //     setTimeout(async () => {
+                //         await BootSplash.hide({ fade: true });
+                //         setAuthLoading(false);
+                //     }, remaining);
+                //     return;
+                // }
 
-                const response = await api.post(`/auth/refreshToken`,{},
+                const response = await api.post(`/auth/refreshToken`, {},
                     {
                         headers: { authorization: `${refreshToken}` },
                     }
@@ -205,8 +231,8 @@ function AppInner() {
 
                 dispatch(
                     userSlice.actions.setUser({
-                        user_code: response.data.data.user_code,
-                        user_name: response.data.data.user_name,
+                        id: response.data.data.user_code || '',
+                        email: response.data.data.email || '',
                         accessToken: response.data.data.accessToken,
                     })
                 );
@@ -217,10 +243,10 @@ function AppInner() {
                 // 최소 3초 보장 후 BootSplash 숨기기
                 const elapsed = Date.now() - startTime;
                 const remaining = Math.max(0, MIN_SPLASH_DURATION - elapsed);
-                setTimeout(async () => {
-                    await BootSplash.hide({ fade: true });
-                    setAuthLoading(false);
-                }, remaining);
+                // setTimeout(async () => {
+                //     await BootSplash.hide({ fade: true });
+                //     setAuthLoading(false);
+                // }, remaining);
             }
         };
 
@@ -235,7 +261,6 @@ function AppInner() {
     return (
         <Stack.Navigator>
             {isLoggedIn ? (
-                // 로그인 완료 - 메인 탭 화면
                 <>
                     <Stack.Screen
                         name="MainTabs"
@@ -245,18 +270,18 @@ function AppInner() {
                         name="PetRegistration"
                         component={PetRegistration}
                         options={{
-                            title: '펫 등록',
-                            headerBackTitleVisible: true,
-                            headerBackTitle:"펫 목록",
+                            title: '환자 등록',
+                            headerBackTitle: "환자 목록",
                             headerTitleAlign: 'center',
                             headerShadowVisible: false,
+                            headerBackTitleVisible: false,
                         }}
                     />
                     <Stack.Screen
                         name="PetList"
                         component={PetList}
                         options={{
-                            title: '펫 선택',
+                            title: '환자 선택',
                             headerShown: true,
                             headerBackTitle: '디바이스 목록'
                         }}
@@ -265,18 +290,22 @@ function AppInner() {
                         name="PetDetail"
                         component={PetDetail}
                         options={{
-                            title: '펫 상세',
-                            headerShown: true,
-                            headerBackTitle: '펫 목록'
+                            title: '환자 상세',
+                            headerBackTitle: "환자 목록",
+                            headerTitleAlign: 'center',
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
                         }}
                     />
                     <Stack.Screen
                         name="PetEdit"
                         component={PetEdit}
                         options={{
-                            title: '펫 수정',
-                            headerShown: true,
-                            headerBackTitle: '펫 상세'
+                            title: '환자 수정',
+                            headerBackTitle: "환자 목록",
+                            headerTitleAlign: 'center',
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
                         }}
                     />
                     <Stack.Screen
@@ -285,6 +314,7 @@ function AppInner() {
                         options={{
                             title: '디바이스 목록',
                             headerShown: true,
+                            headerTitleAlign: 'center',
                             headerBackTitle: '등록된 허브'
                         }}
                     />
@@ -293,8 +323,10 @@ function AppInner() {
                         component={TailingDashBoard}
                         options={{
                             title: '대시보드',
-                            headerShown: true,
-                            headerBackTitle: '디바이스 목록'
+                            headerTitleAlign: 'center',
+                            headerBackTitle: '디바이스 목록',
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
                         }}
                     />
                     <Stack.Screen
@@ -302,8 +334,10 @@ function AppInner() {
                         component={CustomerService}
                         options={{
                             title: '고객센터',
-                            headerShown: true,
-                            headerBackTitle: '내 정보'
+                            headerBackTitle: '내 정보',
+                            headerTitleAlign: 'center',
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
                         }}
                     />
                     <Stack.Screen
@@ -311,28 +345,54 @@ function AppInner() {
                         component={PrivacyPolicy}
                         options={{
                             title: '개인정보 처리방침',
+                            headerTitleAlign: 'center',
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
+                            headerBackTitle: '내 정보'
+                        }}
+                    />
+                    <Stack.Screen
+                        name="ProfileEdit"
+                        component={ProfileEdit}
+                        options={{
+                            title: '프로필 수정',
                             headerShown: true,
                             headerBackTitle: '내 정보'
                         }}
                     />
-                <Stack.Screen
-                    name="ProfileEdit"
-                    component={ProfileEdit}
-                    options={{
-                        title: '프로필 수정',
-                        headerShown: true,
-                        headerBackTitle: '내 정보'
-                    }}
-                />
-                <Stack.Screen
-                    name="CSVDownload"
-                    component={CSVDownload}
-                    options={{
-                        title: 'CSV 다운로드',
-                        headerShown: true,
-                        headerBackTitle: '내 정보'
-                    }}
-                />
+                    <Stack.Screen
+                        name="UserDetail"
+                        component={UserDetail}
+                        options={{
+                            title: '나의 정보',
+                            headerTitleAlign: 'center',
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
+                            headerBackTitle: '더보기'
+                        }}
+                    />
+                    <Stack.Screen
+                        name="HubNameEdit"
+                        component={HubNameEdit}
+                        options={{
+                            title: '허브 이름 변경',
+                            headerTitleAlign: 'center',
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
+                            headerBackTitle: '더보기'
+                        }}
+                    />
+                    <Stack.Screen
+                        name="DeviceNameEdit"
+                        component={DeviceNameEdit}
+                        options={{
+                            title: '디바이스 이름 변경',
+                            headerTitleAlign: 'center',
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
+                            headerBackTitle: '더보기'
+                        }}
+                    />
                 </>
             ) : (
                 // 로그인 전 - 로그인/회원가입 스택
@@ -345,7 +405,13 @@ function AppInner() {
                     <Stack.Screen
                         name="Join"
                         component={Join}
-                        options={{ title: '회원가입' }}
+                        options={{
+                            title: '회원가입',
+                            headerBackTitleVisible: false,
+                            headerTitleAlign: 'center',
+                            headerShadowVisible: false,
+                        }}
+
                     />
                 </>
             )}

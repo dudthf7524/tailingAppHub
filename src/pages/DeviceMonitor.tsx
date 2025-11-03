@@ -17,15 +17,30 @@ const COLORS = {
 const DeviceMonitor = () => {
     const route = useRoute();
     const { deviceId, deviceName } = route.params as { deviceId: string; deviceName: string };
-    const { tailingData } = useTailingData();
-    
-    const dataList = tailingData[deviceId] || [];
+    const { rawWebSocketData } = useTailingData();
+
+    // rawWebSocketData에서 데이터 가져오기
+    let dataList: any[] = [];
+
+    // Handle array format
+    if (Array.isArray(rawWebSocketData)) {
+        const matchedData = rawWebSocketData.find((item: any) => item.deviceAddress === deviceId);
+        if (matchedData && matchedData.deviceData) {
+            dataList = matchedData.deviceData;
+        }
+    } else if (rawWebSocketData && rawWebSocketData.deviceAddress === deviceId && rawWebSocketData.deviceData) {
+        dataList = rawWebSocketData.deviceData;
+    }
     
     // 1초에 50개 데이터가 들어오므로, 50개마다 1개씩 선택 (다운샘플링)
     const sampledData = dataList.filter((_, index) => index % 50 === 0).slice(-60);
-    
-    const irValues = sampledData.map(d => d.ir);
-    const lastData = dataList[dataList.length - 1];
+
+    // IR 값 추출 (문자열을 숫자로 변환)
+    const irValues = sampledData
+        .map(d => Number(d.ir))
+        .filter(value => !isNaN(value) && isFinite(value));
+
+    const lastData = dataList.length > 0 ? dataList[dataList.length - 1] : null;
 
     if (irValues.length === 0) {
         return (
@@ -97,7 +112,7 @@ const DeviceMonitor = () => {
                 {/* 현재 값 */}
                 <View style={styles.infoCard}>
                     <Text style={styles.infoTitle}>현재 값</Text>
-                    <Text style={styles.infoValue}>{lastData?.ir || 0}</Text>
+                    <Text style={styles.infoValue}>{lastData ? Number(lastData.ir) || 0 : 0}</Text>
                 </View>
 
                 {/* 통계 */}

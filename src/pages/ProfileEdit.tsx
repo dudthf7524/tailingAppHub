@@ -1,10 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Modal,
     KeyboardAvoidingView, Platform, ScrollView, Pressable
 } from 'react-native';
 import DaumPostcode from '@actbase/react-daum-postcode';
 import api from '../constant/contants';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store/reducer';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 const COLORS = {
     primary: '#F0663F',
@@ -21,48 +24,63 @@ type ProfileForm = {
     zipCode: string;
     baseAddress: string;
     detailAddress: string;
-    email: string;
-    emailCode: string;
     phone1: string;
     phone2: string;
     phone3: string;
 };
 
 export default function ProfileEdit() {
+    const navigation = useNavigation<any>();
+    const route = useRoute<any>();
+    const accessToken = useSelector((state: RootState) => state.user.accessToken);
+    const receivedUserInfo = route.params?.userInfo;
+
     const [form, setForm] = useState<ProfileForm>({
         name: '',
         zipCode: '',
         baseAddress: '',
         detailAddress: '',
-        email: '',
-        emailCode: '',
         phone1: '010',
         phone2: '',
         phone3: '',
     });
 
-    const [emailSending, setEmailSending] = useState(false);
-    const [emailVerified, setEmailVerified] = useState(false);
-    const [cooldown, setCooldown] = useState(0);
     const [showAddressModal, setShowAddressModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const cooldownRef = useRef<NodeJS.Timeout | null>(null);
 
-    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    // 전화번호 파싱 (010-1234-5678 형식에서 분리)
+    const parsePhone = (phone: string) => {
+        if (!phone) return { phone1: '010', phone2: '', phone3: '' };
+        const parts = phone.split('-');
+        if (parts.length === 3) {
+            return {
+                phone1: parts[0] || '010',
+                phone2: parts[1] || '',
+                phone3: parts[2] || '',
+            };
+        }
+        return { phone1: '010', phone2: '', phone3: '' };
+    };
+
+    // 기존 사용자 정보를 폼에 로드
+    useEffect(() => {
+        if (receivedUserInfo) {
+            console.log('ProfileEdit - receivedUserInfo:', receivedUserInfo);
+            const phoneParts = parsePhone(receivedUserInfo.phone || '');
+
+            setForm({
+                name: receivedUserInfo.name || receivedUserInfo.orgName || '',
+                zipCode: receivedUserInfo.postcode || '',
+                baseAddress: receivedUserInfo.address || '',
+                detailAddress: receivedUserInfo.detailAddress || '',
+                phone1: phoneParts.phone1,
+                phone2: phoneParts.phone2,
+                phone3: phoneParts.phone3,
+            });
+        }
+    }, [receivedUserInfo]);
 
     const set = (k: keyof ProfileForm, v: string) => {
-        if (k === 'email') {
-            // 이메일이 바뀌면 인증 초기화
-            setEmailVerified(false);
-            setForm(prev => ({ ...prev, [k]: v, emailCode: '' }));
-            return;
-        }
-        if (k === 'emailCode') {
-            // 숫자 6자리 제한
-            const only = v.replace(/\D/g, '').slice(0, 6);
-            setForm(prev => ({ ...prev, emailCode: only }));
-            return;
-        }
         setForm(prev => ({ ...prev, [k]: v }));
     };
 
@@ -120,12 +138,6 @@ export default function ProfileEdit() {
             return;
         }
 
-        // 이메일 유효성 검사
-        if (!emailRegex.test(form.email)) {
-            Alert.alert('확인', '올바른 이메일을 입력하세요.');
-            return;
-        }
-
         // 전화번호 유효성 검사
         if (!form.phone2.trim()) {
             Alert.alert('확인', '전화번호를 입력하세요.');
@@ -136,100 +148,50 @@ export default function ProfileEdit() {
             return;
         }
 
-        // 이메일 인증 검사
-        if (!emailVerified) {
-            Alert.alert('확인', '이메일 인증을 완료해주세요.');
-            return;
-        }
-
         try {
             setSubmitting(true);
-            const fullAddress = `${form.baseAddress} ${form.detailAddress}`.trim();
             const fullPhone = form.phone1 + "-" + form.phone2 + "-" + form.phone3;
 
-            // TODO: API 연동해 실제 저장 처리
-            // await api.put('/user/profile', {
-            //     name: form.name.trim(),
-            //     email: form.email.trim(),
-            //     zipCode: form.zipCode.trim(),
-            //     baseAddress: form.baseAddress.trim(),
-            //     detailAddress: form.detailAddress.trim(),
-            //     address: fullAddress,
-            //     phone: fullPhone,
-            // });
-
-            Alert.alert('저장 완료', '프로필이 업데이트되었습니다.');
-        } catch (e: any) {
-            Alert.alert('오류', e?.message ?? '프로필 저장에 실패했습니다.');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    // 쿨다운 타이머
-    useEffect(() => {
-        if (cooldown <= 0) {
-            if (cooldownRef.current) {
-                clearInterval(cooldownRef.current);
-                cooldownRef.current = null;
-            }
-            return;
-        }
-        if (!cooldownRef.current) {
-            cooldownRef.current = setInterval(() => {
-                setCooldown(prev => (prev > 0 ? prev - 1 : 0));
-            }, 1000);
-        }
-        return () => {
-            if (cooldownRef.current) {
-                clearInterval(cooldownRef.current);
-                cooldownRef.current = null;
-            }
-        };
-    }, [cooldown]);
-
-    // 이메일 코드 요청
-    const sendEmailCode = async () => {
-        if (!emailRegex.test(form.email)) {
-            Alert.alert('확인', '올바른 이메일을 입력하세요.');
-            return;
-        }
-        try {
-            setEmailSending(true);
-            setEmailVerified(false);
-            setCooldown(60);
-
-            // 6자리 랜덤 인증번호 생성
-            const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-            // 이메일과 랜덤번호를 서버로 전송
-            await api.post('/user/email/send', {
-                email: form.email,
-                emailCode: randomCode
+            await api.post('/user/edit', {
+                name: form.name.trim(),
+                postcode: form.zipCode.trim(),
+                address: form.baseAddress.trim(),
+                detail_address: form.detailAddress.trim(),
+                phone: fullPhone,
+            }, {
+                headers: { authorization: `${accessToken}` },
             });
 
-            Alert.alert('발송 완료', '인증 코드가 이메일로 전송되었습니다.');
+            Alert.alert('저장 완료', '프로필이 업데이트되었습니다.', [
+                {
+                    text: '확인',
+                    onPress: () => {
+                        // 더보기 페이지로 이동
+                        navigation.reset({
+                            index: 0,
+                            routes: [
+                                {
+                                    name: 'MainTabs',
+                                    state: {
+                                        routes: [
+                                            { name: 'PetList' },
+                                            { name: 'DeviceManagement' },
+                                            { name: 'CSVDownload' },
+                                            { name: 'Profile' },
+                                        ],
+                                        index: 3, // Profile 탭 선택
+                                    },
+                                },
+                            ],
+                        });
+                    },
+                },
+            ]);
         } catch (e: any) {
-            setCooldown(0);
-            Alert.alert('오류', e?.message ?? '코드 발송에 실패했습니다.');
+            console.error('프로필 저장 오류:', e);
+            Alert.alert('오류', e?.response?.data?.message || e?.message || '프로필 저장에 실패했습니다.');
         } finally {
-            setEmailSending(false);
-        }
-    };
-
-    // 이메일 코드 검증
-    const verifyEmailCode = async () => {
-        if (form.emailCode.length !== 6) {
-            Alert.alert('확인', '6자리 인증 코드를 입력하세요.');
-            return;
-        }
-        try {
-            await new Promise(res => setTimeout(res, 500)); // 데모
-            setEmailVerified(true);
-            Alert.alert('인증 완료', '이메일 인증이 완료되었습니다.');
-        } catch (e: any) {
-            setEmailVerified(false);
-            Alert.alert('오류', e?.message ?? '인증에 실패했습니다.');
+            setSubmitting(false);
         }
     };
 
@@ -243,7 +205,7 @@ export default function ProfileEdit() {
                             label="기관명"
                             value={form.name}
                             onChangeText={v => set('name', v)}
-                            placeholder="예) 조이동물의료센터"
+                            placeholder="예) 크림오프 동물병원"
                         />
                         {/* 기관주소 섹션 */}
                         <View style={styles.addressSection}>
@@ -303,42 +265,6 @@ export default function ProfileEdit() {
                             </View>
                         </View>
 
-                        {/* 이메일 + 코드 발송 */}
-                        <LabeledInput
-                            label="이메일"
-                            value={form.email}
-                            onChangeText={v => set('email', v)}
-                            placeholder="name@hospital.com"
-                            autoCapitalize="none"
-                            keyboardType="email-address"
-                            rightAction={
-                                <TouchableOpacity
-                                    onPress={sendEmailCode}
-                                    disabled={emailSending || cooldown > 0}
-                                >
-                                    <Text style={[styles.actionLink, (emailSending || cooldown > 0) && { opacity: 0.5 }]}>
-                                        {cooldown > 0 ? `재전송(${cooldown}s)` : '코드 발송'}
-                                    </Text>
-                                </TouchableOpacity>
-                            }
-                        />
-                        <LabeledInput
-                            label="이메일 인증코드"
-                            value={form.emailCode}
-                            onChangeText={v => set('emailCode', v)}
-                            placeholder="6자리 숫자"
-                            keyboardType="numeric"
-                            rightAction={
-                                <TouchableOpacity onPress={verifyEmailCode} disabled={emailVerified || form.emailCode.length !== 6}>
-                                    <Text style={[styles.actionLink, (emailVerified || form.emailCode.length !== 6) && { opacity: 0.5 }]}>
-                                        {emailVerified ? '인증완료' : '인증하기'}
-                                    </Text>
-                                </TouchableOpacity>
-                            }
-                            hint={emailVerified ? '이메일 인증이 완료되었습니다.' : undefined}
-                            hintColor={emailVerified ? COLORS.success : undefined}
-                        />
-
                         {/* 전화번호 */}
                         <View style={styles.phoneSection}>
                             <Text style={styles.inputLabel}>담당자 전화번호</Text>
@@ -347,7 +273,7 @@ export default function ProfileEdit() {
                                     <View style={styles.phoneInputWrap}>
                                         <TextInput
                                             style={styles.phoneInput}
-                                            value="010"
+                                            value={form.phone1}
                                             onChangeText={() => {}}
                                             placeholder="010"
                                             placeholderTextColor={COLORS.hint}

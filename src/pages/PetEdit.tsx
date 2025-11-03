@@ -121,19 +121,19 @@ export default function PetEdit() {
 
     const validateForm = () => {
         if (!form.name.trim()) {
-            Alert.alert('알림', '펫 이름을 입력하세요.');
+            Alert.alert('알림', '환자 이름을 입력하세요.');
             return false;
         }
         if (!form.species) {
-            Alert.alert('알림', '펫 종류를 선택하세요.');
+            Alert.alert('알림', '환자 종류를 선택하세요.');
             return false;
         }
         if (!form.weight.trim()) {
-            Alert.alert('알림', '펫 체중을 입력하세요.');
+            Alert.alert('알림', '환자 체중을 입력하세요.');
             return false;
         }
         if (!form.gender) {
-            Alert.alert('알림', '펫 성별을 선택하세요.');
+            Alert.alert('알림', '환자 성별을 선택하세요.');
             return false;
         }
         if (!form.neutering) {
@@ -164,7 +164,8 @@ export default function PetEdit() {
 
         try {
             setIsSubmitting(true);
-            const response = await api.put(`/pet/update/${petData.id}`, {
+            const response = await api.post(`/pet/edit`, {
+                id: petData.id,
                 name: form.name.trim(),
                 species: form.species,
                 breed: form.breed.trim(),
@@ -180,16 +181,21 @@ export default function PetEdit() {
                 headers: { authorization: `${accessToken}` },
             });
 
-            Alert.alert('성공', '펫 정보가 수정되었습니다.', [
-                {
-                    text: '확인', onPress: () => {
-                        navigation.goBack();
+            if (response.status === 200) {
+                Alert.alert('성공', response.data.message, [
+                    {
+                        text: '확인', onPress: () => {
+                            // 메인 탭의 환자 목록으로 이동
+                            navigation.navigate('MainTabs', { screen: 'PetList' });
+                        }
                     }
-                }
-            ]);
+                ]);
+            }
+
+
         } catch (error: any) {
-            console.error('펫 수정 오류:', error);
-            Alert.alert('오류', error?.response?.data?.message || '펫 수정 중 오류가 발생했습니다.');
+            console.error('환자 수정 오류:', error);
+            Alert.alert('오류', error?.response?.data?.message || '환자 수정 중 오류가 발생했습니다.');
         } finally {
             setIsSubmitting(false);
         }
@@ -204,7 +210,7 @@ export default function PetEdit() {
                     <Text style={styles.sectionTitle}>기본 정보</Text>
 
                     <LabeledInput
-                        label="펫 이름"
+                        label="환자 이름"
                         value={form.name}
                         onChangeText={v => updateForm('name', v)}
                         placeholder="예) 멍멍이"

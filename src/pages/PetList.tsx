@@ -66,8 +66,8 @@ export default function PetList() {
                 await new Promise(resolve => setTimeout(resolve, remaining));
             }
         } catch (error: any) {
-            console.error('펫 목록 로드 실패:', error);
-            Alert.alert('오류', '펫 목록을 불러오는데 실패했습니다.');
+            console.error('환자 목록 로드 실패:', error);
+            Alert.alert('오류', '환자 목록을 불러오는데 실패했습니다.');
 
             // 에러 시에도 최소 3초 표시
             const elapsed = Date.now();
@@ -187,7 +187,7 @@ export default function PetList() {
 
     const handleDeletePet = async (petId: string, petName: string) => {
         Alert.alert(
-            '펫 삭제',
+            '환자 삭제',
             `${petName}을(를) 삭제하시겠습니까?`,
             [
                 { text: '취소', style: 'cancel' },
@@ -196,14 +196,16 @@ export default function PetList() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await api.delete(`/pet/${petId}`, {
-                                headers: { authorization: `Bearer ${accessToken}` },
+                            await api.post('/pet/delete', {
+                                id: petId,
+                            }, {
+                                headers: { authorization: `${accessToken}` },
                             });
                             Alert.alert('완료', '펫이 삭제되었습니다.');
                             fetchPets(); // 목록 새로고침
                         } catch (error: any) {
-                            console.error('펫 삭제 실패:', error);
-                            Alert.alert('오류', '펫 삭제에 실패했습니다.');
+                            console.error('환자 삭제 실패:', error);
+                            Alert.alert('오류', '환자 삭제에 실패했습니다.');
                         }
                     }
                 }
@@ -270,14 +272,14 @@ export default function PetList() {
     const renderEmptyState = () => (
         <View style={styles.emptyState}>
             <Ionicons name="paw-outline" size={64} color={COLORS.hint} />
-            <Text style={styles.emptyTitle}>등록된 펫이 없습니다</Text>
-            <Text style={styles.emptySubtitle}>새로운 펫을 등록해보세요</Text>
+            <Text style={styles.emptyTitle}>등록된 환자가 없습니다</Text>
+            <Text style={styles.emptySubtitle}>새로운 환자를 등록해보세요</Text>
             <TouchableOpacity
                 style={styles.emptyAddButton}
                 onPress={() => navigation.navigate('PetRegistration')}
             >
                 <Ionicons name="add" size={20} color="#FFF" />
-                <Text style={styles.emptyAddButtonText}>펫 등록하기</Text>
+                <Text style={styles.emptyAddButtonText}>환자 등록하기</Text>
             </TouchableOpacity>
         </View>
     );
@@ -286,7 +288,7 @@ export default function PetList() {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.loadingText}>펫 목록을 불러오는 중...</Text>
+                <Text style={styles.loadingText}>환자 목록을 불러오는 중...</Text>
             </View>
         );
     }
@@ -296,7 +298,7 @@ export default function PetList() {
             <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>
-                        등록된 펫 ({pets.length})
+                        등록된 환자 ({pets.length})
                     </Text>
                     <TouchableOpacity
                         style={styles.addButton}

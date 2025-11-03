@@ -57,6 +57,7 @@ export default function SignUpScreen() {
     const [emailVerified, setEmailVerified] = useState(false);
     const [cooldown, setCooldown] = useState(0); // 재전송 쿨다운(초)
     const cooldownRef = useRef<NodeJS.Timeout | null>(null);
+    const [emailSendCode, setEmailSendCode] = useState("");
 
     // 주소 검색 모달 상태
     const [showAddressModal, setShowAddressModal] = useState(false);
@@ -125,11 +126,11 @@ export default function SignUpScreen() {
         try {
             setEmailSending(true);
             setEmailVerified(false);
-            setCooldown(60);
+            setCooldown(180);
 
             // 6자리 랜덤 인증번호 생성
             const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-
+            setEmailSendCode(randomCode);
             // 이메일과 랜덤번호를 서버로 전송
             await api.post('/user/email/send', {
                 email: form.email,
@@ -151,19 +152,12 @@ export default function SignUpScreen() {
             Alert.alert('확인', '6자리 인증 코드를 입력하세요.');
             return;
         }
-        try {
-            // const res = await api.post('/auth/email/verify', {
-            //   email: form.email,
-            //   code: form.emailCode,
-            // });
-            // if (res.data.verified) setEmailVerified(true);
-
-            await new Promise(res => setTimeout(res, 500)); // 데모
+        if (form.emailCode === emailSendCode) {
             setEmailVerified(true);
             Alert.alert('인증 완료', '이메일 인증이 완료되었습니다.');
-        } catch (e: any) {
+        } else {
             setEmailVerified(false);
-            Alert.alert('오류', e?.message ?? '인증에 실패했습니다.');
+            Alert.alert('인증 실패', '인증에 실패했습니다.');
         }
     };
 
@@ -185,8 +179,8 @@ export default function SignUpScreen() {
             baseAddress += extraAddress;
         }
 
-        setForm(prev => ({ 
-            ...prev, 
+        setForm(prev => ({
+            ...prev,
             zipCode: data.zonecode,
             baseAddress: baseAddress,
             detailAddress: '' // 상세주소는 초기화
@@ -218,13 +212,13 @@ export default function SignUpScreen() {
             Alert.alert('확인', '상세주소를 입력하세요.');
             return;
         }
-        
+
         // 이메일 유효성 검사
         if (!emailRegex.test(form.email)) {
             Alert.alert('확인', '올바른 이메일을 입력하세요.');
             return;
         }
-        
+
         // 비밀번호 유효성 검사
         if (form.password.length < 8) {
             Alert.alert('확인', '비밀번호는 8자 이상이어야 합니다.');
@@ -234,7 +228,7 @@ export default function SignUpScreen() {
             Alert.alert('확인', '비밀번호가 일치하지 않습니다.');
             return;
         }
-        
+
         // 전화번호 유효성 검사
         if (!form.phone2.trim()) {
             Alert.alert('확인', '전화번호를 입력하세요.');
@@ -244,7 +238,7 @@ export default function SignUpScreen() {
             Alert.alert('확인', '전화번호를 입력하세요.');
             return;
         }
-        
+
         // 이메일 인증 검사
         if (!emailVerified) {
             Alert.alert('확인', '이메일 인증을 완료해주세요.');
@@ -273,7 +267,7 @@ export default function SignUpScreen() {
                     onPress: () => navigation.reset({ index: 0, routes: [{ name: '로그인' }] }),
                 },
             ]);
-            
+
         } catch (e: any) {
             Alert.alert('오류', e?.message ?? '회원가입에 실패했습니다.');
         } finally {
@@ -291,12 +285,12 @@ export default function SignUpScreen() {
                             label="기관명"
                             value={form.name}
                             onChangeText={v => set('name', v)}
-                            placeholder="예) 조이동물의료센터"
+                            placeholder="예) 크림오프 동물병원"
                         />
                         {/* 기관주소 섹션 */}
                         <View style={styles.addressSection}>
                             <Text style={styles.inputLabel}>기관주소</Text>
-                            
+
                             {/* 우편번호 */}
                             <View style={{ marginBottom: 16 }}>
                                 <View style={styles.inputWrap}>
@@ -317,7 +311,7 @@ export default function SignUpScreen() {
                                     </View>
                                 </View>
                             </View>
-                            
+
                             {/* 기본주소 */}
                             <View style={{ marginBottom: 16 }}>
                                 <View style={styles.inputWrap}>
@@ -333,7 +327,7 @@ export default function SignUpScreen() {
                                     />
                                 </View>
                             </View>
-                            
+
                             {/* 상세주소 */}
                             <View style={{ marginBottom: 16 }}>
                                 <View style={styles.inputWrap}>
@@ -420,7 +414,7 @@ export default function SignUpScreen() {
                                         <TextInput
                                             style={styles.phoneInput}
                                             value="010"
-                                            onChangeText={() => {}}
+                                            onChangeText={() => { }}
                                             placeholder="010"
                                             placeholderTextColor={COLORS.hint}
                                             keyboardType="numeric"
@@ -502,7 +496,7 @@ export default function SignUpScreen() {
                     </View>
                     <DaumPostcode
                         style={{ flex: 1 }}
-                        jsOptions={{ 
+                        jsOptions={{
                             animation: false,  // 애니메이션 비활성화로 성능 향상
                             hideMapBtn: true,   // 지도 버튼 숨김으로 로딩 시간 단축
                             hideEngBtn: true,   // 영문 버튼 숨김
@@ -571,7 +565,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#ffffff" },
     scroll: { padding: 16, paddingBottom: 40 },
     card: {
-       borderRadius: 16, padding: 20,
+        borderRadius: 16, padding: 20,
         // shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12,
         // shadowOffset: { width: 0, height: 6 }, elevation: 3,
     },
@@ -611,15 +605,15 @@ const styles = StyleSheet.create({
     addressSection: { marginBottom: 16 },
     // 전화번호 관련 스타일
     phoneSection: { marginBottom: 16 },
-    phoneRow: { 
-        flexDirection: 'row', 
+    phoneRow: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between'
     },
     phoneField: { flex: 1 },
-    phoneDash: { 
-        fontSize: 18, 
-        fontWeight: '600', 
+    phoneDash: {
+        fontSize: 18,
+        fontWeight: '600',
         color: COLORS.hint,
         marginHorizontal: 4
     },

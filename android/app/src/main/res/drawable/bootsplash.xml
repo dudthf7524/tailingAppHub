@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android"
     android:opacity="opaque">
-    <item android:drawable="@android:color/white" />
-    <!-- 여기에 로고나 이미지를 추가할 수 있습니다 -->
+    <item android:drawable="@color/bootsplash_background" />
+    <item
+        android:width="100dp"
+        android:height="100dp"
+        android:gravity="center">
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/bootsplash_logo" />
+    </item>
 </layer-list>
 
 

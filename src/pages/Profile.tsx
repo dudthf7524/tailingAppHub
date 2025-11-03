@@ -1,25 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     ScrollView, Alert
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { removeToken } from '../utils/token';
-import EncryptedStorage from 'react-native-encrypted-storage';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store/reducer';
 import { useAppDispatch } from '../store';
+import api from '../constant/contants';
+import EncryptedStorage from 'react-native-encrypted-storage';
 import userSlice from '../slices/user';
-
-const decodeJWT = (token: string) => {
-    try {
-        const base64Payload = token.split('.')[1];
-        const payload = atob(base64Payload);
-        return JSON.parse(payload);
-    } catch (error) {
-        console.error('JWT 디코딩 실패:', error);
-        return null;
-    }
-};
+import { useFocusEffect } from '@react-navigation/native';
 
 const COLORS = {
     primary: '#F0663F',
@@ -33,36 +24,31 @@ const COLORS = {
 
 export default function Profile({ navigation }: any) {
     const dispatch = useAppDispatch();
-    const [userInfo, setUserInfo] = useState({
-        email: '',
-        orgName: '',
-        phone: '',
-        joinDate: ''
-    });
+    const accessToken = useSelector((state: RootState) => state.user.accessToken);
+    const [userInfo, setUserInfo] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        loadUserInfo();
-    }, []);
+    useFocusEffect(
+        React.useCallback(() => {
+            loadUserInfo();
+        }, [])
+    );
 
     const loadUserInfo = async () => {
         try {
-            const token = await AsyncStorage.getItem('accessToken');
-            if (token) {
-                const decodedToken = decodeJWT(token);
-                const email = decodedToken?.email || decodedToken?.org_email || 'Unknown';
-                
-                // 실제로는 API에서 사용자 정보를 가져와야 하지만, 
-                // 현재는 토큰에서 추출한 정보를 사용
-                setUserInfo({
-                    email: email,
-                    orgName: '조이동물의료센터', // 실제로는 API에서 가져와야 함
-                    phone: '010-1234-5678', // 실제로는 API에서 가져와야 함
-                    joinDate: '2024-01-15' // 실제로는 API에서 가져와야 함
-                });
+            setLoading(true);
+            const response = await api.get('/user/information', {
+                headers: { authorization: `${accessToken}` },
+            });
+            console.log("response : ", response)
+            if (response.data) {
+                setUserInfo(response.data.data);
             }
         } catch (error) {
             console.error('사용자 정보 로드 실패:', error);
+            Alert.alert('오류', '사용자 정보를 불러오는데 실패했습니다.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -122,69 +108,59 @@ export default function Profile({ navigation }: any) {
     };
 
     return (
-        <View style={styles.container}>
-            {/* 통합 메뉴 섹션 */}
+        <ScrollView style={styles.container}>
+            {/* 내 정보 섹션 */}
             <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>홍길동</Text>
-                    <TouchableOpacity
-                        onPress={onLogout}
-                        disabled={loading}
-                    >
-                        <Text style={[
-                            styles.logoutText,
-                            loading && { opacity: 0.5 }
-                        ]}>
-                            {loading ? '로그아웃 중...' : '로그아웃'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-                
+                <Text style={styles.sectionTitle}>내 정보</Text>
+
+                {/* 이메일 박스 */}
+                <TouchableOpacity
+                    style={styles.emailBox}
+                    onPress={() => navigation.navigate('UserDetail', { userInfo })}
+                >
+                    <View style={styles.emailContent}>
+                        <Ionicons name="person-circle-outline" size={40} color={COLORS.hint} />
+                        <View style={styles.emailTextContainer}>
+                            <Text style={styles.emailText}>
+                                {userInfo?.email}
+                            </Text>
+                            <Text style={styles.emailSubText}>내 정보 보기</Text>
+                        </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={COLORS.hint} />
+                </TouchableOpacity>
+            </View>
+
+            {/* 메뉴 섹션 */}
+            <View style={styles.section}>
                 <View style={styles.menuContainer}>
-                    <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('ProfileEdit')}>
-                        <View style={styles.menuLeft}>
-                            <View style={styles.menuIconContainer}>
-                                <Ionicons name="person-outline" size={20} color={COLORS.primary} />
-                            </View>
-                            <Text style={styles.menuText}>프로필 수정</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity style={styles.menuItem}>
-                        <View style={styles.menuLeft}>
-                            <View style={styles.menuIconContainer}>
-                                <Ionicons name="key-outline" size={20} color={COLORS.primary} />
-                            </View>
-                            <Text style={styles.menuText}>비밀번호 변경</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
-                    </TouchableOpacity>
-{/* 
                     <TouchableOpacity
                         style={styles.menuItem}
-                        onPress={() => navigation.navigate('CSVDownload')}
+                        onPress={() => navigation.navigate('HubNameEdit')}
                     >
                         <View style={styles.menuLeft}>
                             <View style={styles.menuIconContainer}>
-                                <Ionicons name="download-outline" size={20} color={COLORS.primary} />
+                                <Ionicons name="hardware-chip-outline" size={20} color={COLORS.primary} />
                             </View>
-                            <Text style={styles.menuText}>CSV 파일 다운로드</Text>
+                            <Text style={styles.menuText}>허브 이름 변경</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
-                    </TouchableOpacity> */}
+                    </TouchableOpacity>
 
-                    {/* <TouchableOpacity style={styles.menuItem}>
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => navigation.navigate('DeviceNameEdit')}
+                    >
                         <View style={styles.menuLeft}>
                             <View style={styles.menuIconContainer}>
-                                <Ionicons name="notifications-outline" size={20} color={COLORS.primary} />
+                                <Ionicons name="watch-outline" size={20} color={COLORS.primary} />
                             </View>
-                            <Text style={styles.menuText}>알림 설정</Text>
+                            <Text style={styles.menuText}>디바이스 이름 변경</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
-                    </TouchableOpacity> */}
-                    
-                    <TouchableOpacity 
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
                         style={styles.menuItem}
                         onPress={() => navigation.navigate('PrivacyPolicy')}
                     >
@@ -196,8 +172,8 @@ export default function Profile({ navigation }: any) {
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
                     </TouchableOpacity>
-                    
-                    <TouchableOpacity 
+
+                    <TouchableOpacity
                         style={styles.menuItem}
                         onPress={() => navigation.navigate('CustomerService')}
                     >
@@ -211,7 +187,7 @@ export default function Profile({ navigation }: any) {
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+        </ScrollView>
     );
 }
 
@@ -222,43 +198,52 @@ const styles = StyleSheet.create({
     },
     section: {
         backgroundColor: COLORS.cardBg,
-        margin: 16,
+        marginHorizontal: 16,
         marginTop: 16,
-        marginBottom: 16,
+        marginBottom: 8,
         padding: 20,
-        // borderRadius: 16,
-        // shadowColor: '#000',
-        // shadowOpacity: 0.06,
-        // shadowRadius: 12,
-        // shadowOffset: { width: 0, height: 6 },
-        // elevation: 3,
-        flex: 1,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: '600',
         color: COLORS.text,
+        marginBottom: 16,
     },
-    sectionHeader: {
+    emailBox: {
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
+        padding: 16,
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        justifyContent: 'space-between',
     },
-    logoutText: {
+    emailContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    emailTextContainer: {
+        marginLeft: 12,
+        flex: 1,
+    },
+    emailText: {
         fontSize: 16,
         fontWeight: '600',
-        color: COLORS.error,
+        color: COLORS.text,
+        marginBottom: 4,
+    },
+    emailSubText: {
+        fontSize: 14,
+        color: COLORS.hint,
     },
     menuContainer: {
-        flex: 1,
-        justifyContent: 'space-evenly',
+        gap: 0,
     },
     menuItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        flex: 1,
+        paddingVertical: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#F5F5F5',
     },
@@ -280,10 +265,5 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: COLORS.text,
         fontWeight: '500',
-    },
-    logoutButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
     },
 });

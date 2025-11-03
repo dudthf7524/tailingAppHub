@@ -49,7 +49,7 @@ const NEUTERING_OPTIONS = [
     { label: '중성화안함', value: 'intact' },
 ];
 
-export default function PetRegistration() {
+export default function PetRegistration({ navigation }: any) {
     const accessToken = useSelector((state: RootState) => state.user.accessToken);
     const [form, setForm] = useState<PetForm>({
         name: '',
@@ -91,27 +91,31 @@ export default function PetRegistration() {
 
     const validateForm = () => {
         if (!form.name.trim()) {
-            Alert.alert('알림', '펫 이름을 입력하세요.');
-            return false;
-        }
-        if (!form.species) {
-            Alert.alert('알림', '펫 종류를 선택하세요.');
-            return false;
-        }
-        if (!form.weight.trim()) {
-            Alert.alert('알림', '펫 체중을 입력하세요.');
-            return false;
-        }
-        if (!form.gender) {
-            Alert.alert('알림', '펫 성별을 선택하세요.');
-            return false;
-        }
-        if (!form.neutering) {
-            Alert.alert('알림', '중성화 여부를 선택하세요.');
+            Alert.alert('알림', '환자 이름을 입력하세요.');
             return false;
         }
         if (!form.birthDate.trim()) {
             Alert.alert('알림', '생년월일을 입력하세요.');
+            return false;
+        }
+        if (!form.species) {
+            Alert.alert('알림', '환자 종류를 선택하세요.');
+            return false;
+        }
+        if (!form.breed.trim()) {
+            Alert.alert('알림', '품종을 입력하세요.');
+            return false;
+        }
+        if (!form.weight.trim()) {
+            Alert.alert('알림', '환자 체중을 입력하세요.');
+            return false;
+        }
+        if (!form.gender) {
+            Alert.alert('알림', '환자 성별을 선택하세요.');
+            return false;
+        }
+        if (!form.neutering) {
+            Alert.alert('알림', '중성화 여부를 선택하세요.');
             return false;
         }
         if (!form.admissionDate.trim()) {
@@ -124,6 +128,10 @@ export default function PetRegistration() {
         }
         if (!form.diagnosis.trim()) {
             Alert.alert('알림', '진단명을 입력하세요.');
+            return false;
+        }
+        if (!form.medicalHistory.trim()) {
+            Alert.alert('알림', '과거병력을 입력하세요.');
             return false;
         }
         return true;
@@ -159,26 +167,14 @@ export default function PetRegistration() {
             Alert.alert('성공', `${response.data.message}`, [
                 {
                     text: '확인', onPress: () => {
-                        // 폼 초기화
-                        setForm({
-                            name: '',
-                            species: '',
-                            breed: '',
-                            weight: '',
-                            gender: '',
-                            neutering: '',
-                            birthDate: '',
-                            admissionDate: '',
-                            veterinarian: '',
-                            diagnosis: '',
-                            medicalHistory: '',
-                        });
+                        // 메인 탭의 환자 목록으로 이동
+                        navigation.navigate('MainTabs', { screen: 'PetList' });
                     }
                 }
             ]);
         } catch (error: any) {
-            console.error('펫 등록 오류:', error);
-            Alert.alert('오류', error?.response?.data?.message || '펫 등록 중 오류가 발생했습니다.');
+            console.error('환자 등록 오류:', error);
+            Alert.alert('오류', error?.response?.data?.message || '환자 등록 중 오류가 발생했습니다.');
         } finally {
             setIsSubmitting(false);
         }
@@ -193,7 +189,7 @@ export default function PetRegistration() {
                     <Text style={styles.sectionTitle}>기본 정보</Text>
 
                     <LabeledInput
-                        label="펫 이름"
+                        label="환자 이름"
                         value={form.name}
                         onChangeText={v => updateForm('name', v)}
                         placeholder="예) 멍멍이"
@@ -249,8 +245,9 @@ export default function PetRegistration() {
                             <LabeledInput
                                 label="체중(kg)"
                                 value={form.weight}
-                                onChangeText={v => updateForm('weight', v)}
+                                onChangeText={v => updateForm('weight', v.replace(/\D/g, ''))}
                                 placeholder="체중"
+                                keyboardType="numeric"
                             />
                         </View>
                     </View>
@@ -351,7 +348,7 @@ export default function PetRegistration() {
                             pressed && { transform: [{ scale: 0.99 }] },
                         ]}
                     >
-                        <Text style={styles.buttonText}>{isSubmitting ? '처리 중...' : '펫 등록하기'}</Text>
+                        <Text style={styles.buttonText}>{isSubmitting ? '처리 중...' : '환자 등록하기'}</Text>
                     </Pressable>
                 </View>
             </ScrollView>
@@ -387,8 +384,9 @@ function LabeledInput(props: {
     onChangeText: (v: string) => void;
     placeholder?: string;
     multiline?: boolean;
+    keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
 }) {
-    const { label, value, onChangeText, placeholder, multiline } = props;
+    const { label, value, onChangeText, placeholder, multiline, keyboardType } = props;
     return (
         <View style={{ marginBottom: 16 }}>
             <Text style={styles.inputLabel}>{label}</Text>
@@ -402,6 +400,7 @@ function LabeledInput(props: {
                     multiline={multiline}
                     numberOfLines={multiline ? 4 : 1}
                     textAlignVertical={multiline ? 'top' : 'center'}
+                    keyboardType={keyboardType}
                 />
             </View>
         </View>

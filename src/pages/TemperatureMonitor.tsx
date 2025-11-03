@@ -25,11 +25,21 @@ const screenWidth = Dimensions.get('window').width;
 const TemperatureMonitor = () => {
     const route = useRoute();
     const { deviceId, deviceName } = route.params as { deviceId: string; deviceName: string };
-    const { tailingData } = useTailingData();
+    const { rawWebSocketData } = useTailingData();
+
+    console.log('=== TemperatureMonitor 디버깅 ===');
+    console.log('deviceId:', deviceId);
+    console.log('rawWebSocketData:', rawWebSocketData);
 
     const [data, setData] = useState<TempDataPoint[]>([]);
     const [isAutoScrolling, setIsAutoScrolling] = useState(true);
     const scrollViewRef = useRef<ScrollView>(null);
+    console.log("data : ", data);
+    // 0이 아닌 마지막 값들을 저장
+    const [lastValidHr, setLastValidHr] = useState<number>(0);
+    const [lastValidSpo2, setLastValidSpo2] = useState<number>(0);
+    const [lastValidTemp, setLastValidTemp] = useState<number>(0);
+    const [lastValidBattery, setLastValidBattery] = useState<number>(0);
 
     const pointsPerView = 100;
     const pointWidth = screenWidth / pointsPerView;
@@ -38,10 +48,10 @@ const TemperatureMonitor = () => {
     const padding = 40;
     const graphHeight = chartHeight - padding;
 
-    // Y축 범위 계산
+    // Y축 범위 계산 (낮은 체온 값도 표시 가능하도록 기본 범위 완화)
     const getYAxisRange = () => {
         if (!data || data.length === 0) {
-            return { min: 35, max: 42 };
+            return { min: 20, max: 45 };
         }
 
         const values = data
@@ -49,19 +59,18 @@ const TemperatureMonitor = () => {
             .filter(value => typeof value === 'number' && !isNaN(value) && isFinite(value));
 
         if (values.length === 0) {
-            return { min: 35, max: 42 };
+            return { min: 20, max: 45 };
         }
-
         const min = Math.min(...values);
         const max = Math.max(...values);
 
         if (min === max) {
-            return { min: Math.max(35, min - 0.5), max: max + 0.5 };
+            return { min: Math.max(20, min - 0.5), max: max + 0.5 };
         }
 
         const paddingValue = (max - min) * 0.1;
         return {
-            min: Math.max(35, min - paddingValue),
+            min: Math.max(20, min - paddingValue),
             max: max + paddingValue
         };
     };
@@ -69,35 +78,82 @@ const TemperatureMonitor = () => {
     // TEMP 데이터를 그래프 데이터로 변환 (1초마다)
     useEffect(() => {
         try {
-            const dataList = tailingData[deviceId] || [];
+            // rawWebSocketData에서 데이터 가져오기
+            let dataList: any[] = [];
 
-            if (!isAutoScrolling || !dataList || dataList.length === 0) return;
+            // Handle array format
+            if (Array.isArray(rawWebSocketData)) {
+                const matchedData = rawWebSocketData.find((item: any) => item.deviceAddress === deviceId);
+                if (matchedData && matchedData.deviceData) {
+                    dataList = matchedData.deviceData;
+                    console.log('📊 rawWebSocketData 배열에서 온도 데이터 사용:', dataList.length, '개');
+                }
+            } else if (rawWebSocketData && rawWebSocketData.deviceAddress === deviceId && rawWebSocketData.deviceData) {
+                dataList = rawWebSocketData.deviceData;
+                console.log('📊 rawWebSocketData 객체에서 온도 데이터 사용:', dataList.length, '개');
+            }
 
-            // TEMP 값 추출
-            const tempValues = dataList
-                .filter(item => typeof item.temp === 'number' && !isNaN(item.temp) && isFinite(item.temp))
-                .map(item => item.temp);
+            if (!isAutoScrolling || !dataList || dataList.length === 0) {
+                console.log('⚠️ 온도 데이터 없음');
+                return;
+            }
 
-            if (tempValues.length === 0) return;
+            // TEMP 값 추출 (문자열을 숫자로 변환, 0 포함하여 버퍼링)
+            const tempChunk = dataList
+                .map(item => Number(item.temp))
+                .filter(value => !isNaN(value) && isFinite(value));
 
-            // 데이터 포인트 수를 줄임
-            const step = Math.max(1, Math.floor(tempValues.length / 100));
+            // HR/SPO2/BATTERY도 0이 아닌 값만 추출
+            const hrValues = dataList
+                .map(item => Number(item.hr))
+                .filter(value => !isNaN(value) && isFinite(value) && value > 0);
+            const spo2Values = dataList
+                .map(item => Number(item.spo2))
+                .filter(value => !isNaN(value) && isFinite(value) && value > 0);
+            const batteryValues = dataList
+                .map(item => Number(item.battery))
+                .filter(value => !isNaN(value) && isFinite(value) && value > 0);
 
-            const newTempPoints: TempDataPoint[] = tempValues
-                .filter((_, index) => index % step === 0)
-                .map((value, index) => ({
-                    timestamp: Date.now() + index * 20,
-                    value: value
-                }));
+            console.log('📊 온도 값 추출(청크):', tempChunk.length, '개');
 
-            setData(prevData => {
-                const updatedData = [...prevData, ...newTempPoints];
-                return updatedData.slice(-100);
-            });
+            // 청크(50개 예상)를 즉시 그래프에 반영
+            // 0 값은 직전 유효값(lastValidTemp)으로 보간하여 선이 끊기지 않도록 처리
+            let currentLast = lastValidTemp;
+            const resolvedValues: number[] = [];
+            for (const v of tempChunk) {
+                if (v > 0) {
+                    currentLast = v;
+                    resolvedValues.push(v);
+                } else if (currentLast > 0) {
+                    resolvedValues.push(currentLast);
+                }
+                // currentLast가 0이고 v도 0이면 값을 추가하지 않아 그래프 시작 전까지는 비움
+            }
+
+            if (resolvedValues.length > 0) {
+                const step = Math.max(1, Math.floor(resolvedValues.length / 100));
+                const points: TempDataPoint[] = resolvedValues
+                    .filter((_, index) => index % step === 0)
+                    .map((value, index) => ({
+                        timestamp: Date.now() + index * 20,
+                        value,
+                    }));
+                setData(prev => {
+                    const merged = [...prev, ...points];
+                    return merged.slice(-100);
+                });
+            }
+
+            // 마지막 유효한 값들 업데이트: 이번 청크에서 0이 아닌 마지막 값 사용
+            const tempNonZero = tempChunk.filter(v => v > 0);
+            if (tempNonZero.length > 0) setLastValidTemp(tempNonZero[tempNonZero.length - 1]);
+            if (hrValues.length > 0) setLastValidHr(hrValues[hrValues.length - 1]);
+            if (spo2Values.length > 0) setLastValidSpo2(spo2Values[spo2Values.length - 1]);
+            if (batteryValues.length > 0) setLastValidBattery(batteryValues[batteryValues.length - 1]);
         } catch (error) {
             console.error('Error processing TEMP data:', error);
         }
-    }, [deviceId, tailingData, isAutoScrolling]);
+    }, [deviceId, rawWebSocketData, isAutoScrolling]);
 
     // 자동 스크롤
     useEffect(() => {
@@ -116,7 +172,7 @@ const TemperatureMonitor = () => {
     const getYLabels = () => {
         const { min, max } = getYAxisRange();
         const range = max - min;
-        if (range <= 0) return ['35', '37', '39', '41'];
+        if (range <= 0) return ['20', '26', '32', '38', '44'];
 
         const step = range / 4;
         return Array.from({ length: 5 }, (_, i) =>
@@ -153,7 +209,6 @@ const TemperatureMonitor = () => {
     };
 
     const yLabels = getYLabels();
-    const lastData = tailingData[deviceId]?.[tailingData[deviceId].length - 1];
 
     if (data.length === 0) {
         return (
@@ -167,11 +222,11 @@ const TemperatureMonitor = () => {
     const maxValue = data.length > 0 ? Math.max(...data.map(p => p.value)) : 0;
     const avgValue = data.length > 0 ? data.map(p => p.value).reduce((a, b) => a + b, 0) / data.length : 0;
 
-    // 현재 vital signs 값 가져오기
-    const currentHr = lastData?.hr || 0;
-    const currentSpo2 = lastData?.spo2 || 0;
-    const currentTemp = lastData?.temp || 0;
-    const batteryLevel = lastData?.battery || 0;
+    // 0이 아닌 마지막 유효 값을 사용
+    const currentHr = lastValidHr || 0;
+    const currentSpo2 = lastValidSpo2 || 0;
+    const currentTemp = lastValidTemp || 0;
+    const batteryLevel = lastValidBattery || 0;
 
     // 배터리 아이콘 선택
     const getBatteryIcon = (level: number) => {

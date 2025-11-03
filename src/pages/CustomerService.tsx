@@ -25,13 +25,13 @@ const CustomerService = ({ navigation }: any) => {
         {
             title: '이메일 문의',
             icon: 'mail-outline',
-            description: 'support@tailing.com',
+            description: 'creamoff2021@nave.com',
             onPress: handleEmailPress,
         },
         {
             title: '전화 문의',
             icon: 'call-outline',
-            description: '1588-0000',
+            description: '070-4571-7580',
             onPress: handlePhonePress,
         },
         {
@@ -39,21 +39,21 @@ const CustomerService = ({ navigation }: any) => {
             icon: 'time-outline',
             description: '평일 09:00 ~ 18:00',
         },
-        {
-            title: '자주 묻는 질문',
-            icon: 'help-circle-outline',
-            description: 'FAQ',
-        },
-        {
-            title: '공지사항',
-            icon: 'notifications-outline',
-            description: '최신 공지사항',
-        },
-        {
-            title: '앱 버전',
-            icon: 'information-circle-outline',
-            description: '1.0.0',
-        },
+        // {
+        //     title: '자주 묻는 질문',
+        //     icon: 'help-circle-outline',
+        //     description: 'FAQ',
+        // },
+        // {
+        //     title: '공지사항',
+        //     icon: 'notifications-outline',
+        //     description: '최신 공지사항',
+        // },
+        // {
+        //     title: '앱 버전',
+        //     icon: 'information-circle-outline',
+        //     description: '1.0.0',
+        // },
     ];
 
     return (
@@ -78,12 +78,12 @@ const CustomerService = ({ navigation }: any) => {
                                     <Text style={styles.menuDescription}>{item.description}</Text>
                                 </View>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={COLORS.hint} />
+                            {/* <Ionicons name="chevron-forward" size={20} color={COLORS.hint} /> */}
                         </TouchableOpacity>
                     ))}
                 </View>
 
-                <View style={styles.section}>
+                {/* <View style={styles.section}>
                     <View style={styles.infoCard}>
                         <Text style={styles.infoTitle}>24시간 기술 지원</Text>
                         <Text style={styles.infoText}>
@@ -97,7 +97,7 @@ const CustomerService = ({ navigation }: any) => {
                             {'\n'}전화 문의: 즉시 응답
                         </Text>
                     </View>
-                </View>
+                </View> */}
             </ScrollView>
         </View>
     );

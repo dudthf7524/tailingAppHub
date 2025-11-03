@@ -6,9 +6,8 @@ import { useSelector } from "react-redux";
 import api from "../constant/contants";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useTailingData } from '../contexts/TailingDataContext';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList } from '../../AppInner';
 
 const COLORS = {
     primary: '#F0663F',
@@ -30,15 +29,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'TailingDeviceList'>;
 
 export default function HubList() {
     const accessToken = useSelector((state: RootState) => state.user.accessToken);
-    const id = useSelector((state: RootState) => state.user.id);
     const [hub, setHub] = useState<Hub[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const { connectedHubs } = useTailingData();
     const navigation = useNavigation<Nav>();
-
-    console.log("HubList 컴포넌트 렌더링됨");
-    console.log("accessToken : ", accessToken);
-    console.log("id : ", id);
 
     const fetchData = useCallback(async () => {
         console.log("fetchData 호출됨");
@@ -49,7 +41,7 @@ export default function HubList() {
         }
 
         try {
-            setIsLoading(true);
+            console.log(api)
             console.log("API 요청 시작...");
             console.log("accessToken", accessToken)
             const response = await api.get(`/hub/list/`, {
@@ -58,29 +50,17 @@ export default function HubList() {
             console.log("API 응답 코드 : ", response.status);
             console.log("API 응답 데이터 : ", response.data.data);
             setHub(response.data.data);
-            // API 응답을 hub에 담기
-            // setHub(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
             const err = error as AxiosError;
             console.error('데이터 로드 실패:', err.response?.data || err.message);
-        } finally {
-            setIsLoading(false);
         }
     }, [accessToken]);
     
     console.log("hub", hub);
-    console.log("connectedHubs", connectedHubs);
 
-    // 허브가 연결되어 있는지 확인하는 함수
-    const isHubConnected = (hubAddress: string) => {
-        return connectedHubs.has(hubAddress);
-    };
-
-    // 연결중인 허브 클릭 시 디바이스 목록으로 이동
+    // 허브 클릭 시 디바이스 목록으로 이동 (연결 상태 확인 안 함)
     const handleHubPress = (hubItem: Hub) => {
-        if (isHubConnected(hubItem.address)) {
-            navigation.navigate('TailingDeviceList', { hubId: hubItem.id, hubName: hubItem.name || '허브' });
-        }
+        navigation.navigate('TailingDeviceList', { hubAddress: hubItem.address, hubName: hubItem.name || '허브' });
     };
 
     // 화면이 포커스될 때마다 데이터 로드
@@ -98,35 +78,21 @@ export default function HubList() {
     }, [fetchData])
 
     const renderHubItem = ({ item }: { item: Hub }) => {
-        const isConnected = isHubConnected(item.address);
-        
         return (
-            <TouchableOpacity 
-                style={[
-                    styles.deviceItem,
-                    isConnected && styles.deviceItemConnected
-                ]}
+            <TouchableOpacity
+                style={styles.deviceItem}
                 onPress={() => handleHubPress(item)}
-                disabled={!isConnected}
             >
                 <View style={styles.deviceInfo}>
                     <View style={styles.deviceHeader}>
                         <Ionicons
                             name="hardware-chip"
                             size={24}
-                            color={isConnected ? COLORS.success : COLORS.hint}
+                            color={COLORS.primary}
                         />
                         <Text style={styles.deviceName}>{item.name || '허브'}</Text>
-                        <View style={[
-                            styles.connectedBadge, 
-                            { backgroundColor: isConnected ? COLORS.success : '#E74C3C' }
-                        ]}>
-                            <Text style={styles.connectedText}>
-                                {isConnected ? '연결중' : '미연결'}
-                            </Text>
-                        </View>
                     </View>
-                    <Text style={styles.deviceId}>주소: {item.address}</Text>
+                    {/* <Text style={styles.deviceId}>주소: {item.address}</Text> */}
                     {item.createdAt && (
                         <Text style={styles.rssi}>
                             등록일: {new Date(item.createdAt).toLocaleDateString('ko-KR')}
@@ -140,9 +106,9 @@ export default function HubList() {
     return (
         <View style={styles.container}>
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
+                {/* <Text style={styles.sectionTitle}>
                     등록된 장치 ({hub.length})
-                </Text>
+                </Text> */}
                 {hub.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Ionicons name="hardware-chip-outline" size={48} color={COLORS.hint} />
@@ -152,7 +118,7 @@ export default function HubList() {
                     <FlatList
                         data={hub}
                         renderItem={renderHubItem}
-                        keyExtractor={(item) => item.id}
+                        keyExtractor={(item) => item.address}
                         style={styles.deviceList}
                     />
                 )}
