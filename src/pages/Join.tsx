@@ -268,11 +268,11 @@ export default function SignUpScreen() {
             return;
         }
 
-        // 이메일 인증 검사
-        // if (!emailVerified) {
-        //     Alert.alert('확인', '이메일 인증을 완료해주세요.');
-        //     return;
-        // }
+        if (!emailVerified) {
+            Alert.alert('확인', '이메일 인증을 완료해주세요.');
+            return;
+        }
+        
         try {
             setSubmitting(true);
             const fullAddress = `${form.baseAddress} ${form.detailAddress}`.trim();

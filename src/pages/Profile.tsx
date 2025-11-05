@@ -168,7 +168,7 @@ export default function Profile({ navigation }: any) {
                             <View style={styles.menuIconContainer}>
                                 <Ionicons name="link-outline" size={20} color={COLORS.primary} />
                             </View>
-                            <Text style={styles.menuText}>디바이스 펫 연결 변경</Text>
+                            <Text style={styles.menuText}>디바이스 환자 연결 변경</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
                     </TouchableOpacity>

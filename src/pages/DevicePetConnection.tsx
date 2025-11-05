@@ -43,7 +43,7 @@ export default function DevicePetConnection() {
     const [connectedDevices, setConnectedDevices] = useState<any[]>([]); // 연결된 디바이스-환자 데이터 (원본 그대로)
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-console.log("connectedDevices:", connectedDevices);
+    console.log("connectedDevices:", connectedDevices);
     // 환자 선택 모달 상태
     const [petSelectModalVisible, setPetSelectModalVisible] = useState(false);
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -55,15 +55,15 @@ console.log("connectedDevices:", connectedDevices);
     // 조인 결과: d.address, d.name, p.name, p.id
     const fetchDevicePetConnections = async () => {
         if (!accessToken) return;
-        
+
         try {
             const response = await api.get('/pet/connect/device', {
                 headers: { authorization: `${accessToken}` },
             });
-            
+
             console.log("device-pet connections response:", response);
             console.log("device-pet connections response.data:", response.data);
-            
+
             // 응답 구조: { data: [ { address, device_name, Pet: { pet_id, pet_name, breed } } ] }
             if (response.data && Array.isArray(response.data.data || response.data)) {
                 const dataArray = response.data.data || response.data;
@@ -81,13 +81,13 @@ console.log("connectedDevices:", connectedDevices);
         if (!accessToken) {
             return;
         }
-        
+
         try {
             setIsLoadingPets(true);
             const response = await api.get('/pet/connect/device/list', {
                 headers: { authorization: `${accessToken}` },
             });
-            
+
             if (Array.isArray(response.data.data)) {
                 // API 반환값을 그대로 setPets에 담기
                 setPets(response.data.data);
@@ -120,37 +120,23 @@ console.log("connectedDevices:", connectedDevices);
 
     // 환자 변경 버튼 클릭
     const handleChangePet = (device: Device) => {
-        // 모달이 이미 열려있으면 selectedDevice만 변경하고 펫 목록만 다시 가져오기
+        // 모달이 이미 열려있으면 selectedDevice만 변경하고 환자 목록만 다시 가져오기
         setSelectedDevice(device);
-            fetchPets();
-            setPetSelectModalVisible(true);
-        // if (petSelectModalVisible) {
-        //     setSelectedDevice(device);
-        //     fetchPets();
-        // } else {
-        //     // 모달이 닫혀있으면 바로 열기
-        //     setSelectedDevice(device);
-        //     setPetSelectModalVisible(true);
-        //     // 펫 목록 가져오기
-        //     setTimeout(() => {
-        //         fetchPets();
-        //     }, 200);
-        // }
+        fetchPets();
+        setPetSelectModalVisible(true);
+
     };
 
     // 모달 닫기
     const handleCloseModal = () => {
         setPetSelectModalVisible(false);
-        // 상태 초기화는 모달이 완전히 닫힌 후에
-        // setTimeout(() => {
-        //     setSelectedDevice(null);
-        // }, 300);
+      
     };
 
     // 환자 선택 처리
     const handleSelectPet = async (pet: Pet) => {
         if (!selectedDevice) return;
-        
+
         // 모달을 임시로 닫지 않고 유지하면서 알림창 표시
         // 확인 알림창 표시
         Alert.alert(
@@ -176,10 +162,10 @@ console.log("connectedDevices:", connectedDevices);
                             // 모달 먼저 닫기
                             setPetSelectModalVisible(false);
                             setSelectedDevice(null);
-                            
+
                             // 연결 상태 새로고침
                             await fetchDevicePetConnections();
-                            
+
                             // 완료 알림은 모달이 닫힌 후에 표시
                             setTimeout(() => {
                                 Alert.alert('완료', `${pet.name}이(가) ${selectedDevice?.device_name}에 연결되었습니다.`);
@@ -241,10 +227,10 @@ console.log("connectedDevices:", connectedDevices);
                 {connectedPet ? (
                     <View style={styles.petInfoSection}>
                         <View style={styles.petInfoRow}>
-                            <Ionicons 
-                                name={getSpeciesIcon(connectedPet.species)} 
-                                size={20} 
-                                color={COLORS.success} 
+                            <Ionicons
+                                name={getSpeciesIcon(connectedPet.species)}
+                                size={20}
+                                color={COLORS.success}
                             />
                             <Text style={styles.petName}>{connectedPet.pet_name}</Text>
                             {connectedPet.breed && (
@@ -282,7 +268,7 @@ console.log("connectedDevices:", connectedDevices);
     return (
         <SafeAreaView style={styles.container} edges={['bottom']}>
             <View style={styles.section}>
-               
+
                 {connectedDevices.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <Ionicons name="watch-outline" size={64} color={COLORS.hint} />
@@ -331,7 +317,7 @@ console.log("connectedDevices:", connectedDevices);
                     ) : pets.length === 0 ? (
                         <View style={styles.modalEmptyContainer}>
                             <Ionicons name="paw-outline" size={64} color={COLORS.hint} />
-                            <Text style={styles.modalEmptyText}>디바이스와 연결되지 않은 펫이 없습니다.</Text>
+                            <Text style={styles.modalEmptyText}>디바이스와 연결되지 않은 환자이 없습니다.</Text>
                         </View>
                     ) : (
                         <FlatList

@@ -86,7 +86,7 @@ function MainTabs() {
                     ),
                 }}
             />
-            
+
             <Tab.Screen
                 name="Profile"
                 component={Profile}
@@ -361,8 +361,10 @@ function AppInner() {
                         component={ProfileEdit}
                         options={{
                             title: '프로필 수정',
-                            headerShown: true,
-                            headerBackTitle: '내 정보'
+                            headerBackTitle: '내 정보',
+                            headerTitleAlign: 'center',
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
                         }}
                     />
                     <Stack.Screen
@@ -402,7 +404,7 @@ function AppInner() {
                         name="DevicePetConnection"
                         component={DevicePetConnection}
                         options={{
-                            title: '디바이스 펫 연결 변경',
+                            title: '디바이스 환자 연결 변경',
                             headerTitleAlign: 'center',
                             headerShadowVisible: false,
                             headerBackTitleVisible: false,
