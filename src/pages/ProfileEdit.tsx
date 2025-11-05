@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
         position: 'relative', backgroundColor: '#fff', borderRadius: 10,
         borderWidth: 1, borderColor: '#EFE7E0', paddingHorizontal: 18, paddingVertical: 10,
     },
-    input: { height: 44, fontSize: 16, color: COLORS.text, paddingRight: 80, flex: 1 },
+    input: { paddingVertical: 10, fontSize: 16, color: COLORS.text, paddingRight: 80, flex: 1 },
     rightAction: { position: 'absolute', right: 14, top: 10, height: 44, justifyContent: 'center', alignItems: 'center' },
     eye: { fontSize: 14, color: COLORS.hint, fontWeight: '600' },
     actionLink: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
