@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView,
-    Alert, Pressable
+    Alert, Pressable, KeyboardAvoidingView, Platform
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
@@ -9,6 +9,7 @@ import api from '../constant/contants';
 import { RootState } from '../store/reducer';
 import { useSelector } from 'react-redux';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const COLORS = {
     primary: '#F0663F',
@@ -52,8 +53,8 @@ const GENDER_OPTIONS = [
 ];
 
 const NEUTERING_OPTIONS = [
-    { label: '중성화함', value: 'sterilized' },
-    { label: '중성화안함', value: 'intact' },
+    { label: 'O', value: 'sterilized' },
+    { label: 'X', value: 'intact' },
 ];
 
 export default function PetEdit() {
@@ -202,8 +203,9 @@ export default function PetEdit() {
     };
 
     return (
-        <View style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <SafeAreaView style={styles.container} edges={['bottom']}>
+            <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: "height" })} style={{ flex: 1 }}>
+                <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 {/* 카드 */}
                 <View style={styles.card}>
                     {/* 기본 정보 섹션 */}
@@ -371,7 +373,8 @@ export default function PetEdit() {
                         <Text style={styles.buttonText}>{isSubmitting ? '처리 중...' : '수정하기'}</Text>
                     </Pressable>
                 </View>
-            </ScrollView>
+                </ScrollView>
+            </KeyboardAvoidingView>
 
             {/* 날짜 선택 모달들 */}
             <DateTimePickerModal
@@ -380,6 +383,7 @@ export default function PetEdit() {
                 onConfirm={handleBirthDateConfirm}
                 onCancel={() => setShowBirthDateModal(false)}
                 date={form.birthDate ? new Date(form.birthDate) : new Date()}
+                maximumDate={new Date()}
                 confirmTextIOS="확인"
                 cancelTextIOS="취소"
                 locale="ko_KR"
@@ -394,7 +398,7 @@ export default function PetEdit() {
                 cancelTextIOS="취소"
                 locale="ko_KR"
             />
-        </View>
+        </SafeAreaView>
     );
 }
 

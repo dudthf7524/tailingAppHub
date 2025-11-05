@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const COLORS = {
@@ -131,7 +132,7 @@ const PrivacyPolicy = ({ navigation }: any) => {
     ];
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             <ScrollView style={styles.scrollView}>
                 <View style={styles.contentContainer}>
                     {sections.map((section, index) => (
@@ -142,7 +143,7 @@ const PrivacyPolicy = ({ navigation }: any) => {
                     ))}
                 </View>
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 };
 

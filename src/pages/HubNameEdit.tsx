@@ -231,13 +231,13 @@ const styles = StyleSheet.create({
         marginLeft: 28,
     },
     input: {
-        height: 40,
         borderWidth: 1,
         borderColor: '#EFE7E0',
         borderRadius: 8,
         paddingHorizontal: 12,
         backgroundColor: '#fff',
         fontSize: 16,
+        paddingVertical:10
     },
     editButton: {
         width: 40,

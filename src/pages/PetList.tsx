@@ -98,7 +98,7 @@ export default function PetList() {
             case 'dog':
                 return 'paw';
             case 'cat':
-                return 'logo-octocat';
+                return 'paw';
             case 'other':
                 return 'paw';
             default:
@@ -135,50 +135,51 @@ export default function PetList() {
         try {
             const birth = new Date(birthDate);
             const today = new Date();
-            
+
             // 유효하지 않은 날짜인 경우
             if (isNaN(birth.getTime())) {
                 return '알 수 없음';
             }
-            
+
             // 미래 날짜인 경우
             if (birth > today) {
                 return '미래 날짜';
             }
-            
+
             const yearDiff = today.getFullYear() - birth.getFullYear();
             const monthDiff = today.getMonth() - birth.getMonth();
             const dayDiff = today.getDate() - birth.getDate();
-            
+
             // 총 개월 수 계산
             let totalMonths = yearDiff * 12 + monthDiff;
-            
+
             // 일수가 음수면 한 달 빼기
             if (dayDiff < 0) {
                 totalMonths -= 1;
             }
-            
+
+            // 1개월 미만인 경우 일수로 계산
+            if (totalMonths < 1) {
+                const timeDiff = today.getTime() - birth.getTime();
+                const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+                return `생후 ${daysDiff}일`;
+            }
+
             // 1년 미만인 경우 개월 단위로 표시
             if (totalMonths < 12) {
-                if (totalMonths === 0) {
-                    return '신생아';
-                } else if (totalMonths < 1) {
-                    return '1개월 미만';
-                } else {
-                    return `${totalMonths}개월`;
-                }
+                return `${totalMonths}개월`;
             }
-            
+
             // 1년 이상인 경우 년 단위로 표시
             const years = Math.floor(totalMonths / 12);
             const remainingMonths = totalMonths % 12;
-            
+
             if (remainingMonths === 0) {
                 return `${years}세`;
             } else {
                 return `${years}세 ${remainingMonths}개월`;
             }
-            
+
         } catch (error) {
             console.error('나이 계산 오류:', error);
             return '알 수 없음';
@@ -196,13 +197,17 @@ export default function PetList() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await api.post('/pet/delete', {
+                            const response = await api.post('/pet/delete', {
                                 id: petId,
                             }, {
                                 headers: { authorization: `${accessToken}` },
                             });
-                            Alert.alert('완료', '펫이 삭제되었습니다.');
-                            fetchPets(); // 목록 새로고침
+                            if (response.status === 200) {
+                                Alert.alert('완료', '펫이 삭제되었습니다.');
+                                fetchPets(); // 목록 새로고침
+                            } else {
+                                Alert.alert('오류', '환자 삭제에 실패했습니다.');
+                            }// 목록 새로고침
                         } catch (error: any) {
                             console.error('환자 삭제 실패:', error);
                             Alert.alert('오류', '환자 삭제에 실패했습니다.');
@@ -239,7 +244,7 @@ export default function PetList() {
                         </TouchableOpacity>
                     </View>
                 </View>
-                
+
                 <View style={styles.petDetailsRow}>
                     <View style={styles.detailItem}>
                         <Text style={styles.detailLabel}>품종</Text>
@@ -307,7 +312,7 @@ export default function PetList() {
                         <Ionicons name="add" size={24} color="#FFF" />
                     </TouchableOpacity>
                 </View>
-                
+
                 {pets.length === 0 ? (
                     renderEmptyState()
                 ) : (

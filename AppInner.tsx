@@ -16,6 +16,7 @@ import CSVDownload from "./src/pages/CSVDownload";
 import UserDetail from "./src/pages/UserDetail";
 import HubNameEdit from "./src/pages/HubNameEdit";
 import DeviceNameEdit from "./src/pages/DeviceNameEdit";
+import DevicePetConnection from "./src/pages/DevicePetConnection";
 import Login from "./src/pages/Login";
 import Join from "./src/pages/Join";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -144,32 +145,47 @@ export type RootStackParamList = {
     UserDetail: undefined;
     HubNameEdit: undefined;
     DeviceNameEdit: undefined;
+    DevicePetConnection: undefined;
 };
 
 function AppInner() {
     const [isLoading, setIsLoading] = useState(true);
     const [isAuthLoading, setAuthLoading] = useState(true);
     const isLoggedIn = useSelector((state: RootState) => !!state.user.accessToken);
-    console.log("isLoggedIn", isLoggedIn);
     const dispatch = useAppDispatch()
-    console.log("함수실행중");
+    const isLoggingOutRef = useRef(false);
     useEffect(() => {
-        console.log("실행됨")
         api.interceptors.response.use(
             response => {
-                console.log(response);
                 return response;
             },
             async error => {
-                console.log("실행됨")
+                // 400 에러는 비즈니스 로직 에러이므로 인터셉터에서 처리하지 않고 원래 catch로 전달
+                if (!error.response || error.response.status === 400) {
+                    return Promise.reject(error);
+                }
+                
                 const { config, response: { status } } = error;
-                console.log(error)
                 if (status === 419) {
                     if (error.response.data.code === 'expired') {
                         const originalRequest = config;
                         const refreshToken = await EncryptedStorage.getItem('refreshToken');
                         console.log("refreshToken", refreshToken);
-                        if (!refreshToken) return;
+                        if (!refreshToken) {
+                            if (!isLoggingOutRef.current) {
+                                isLoggingOutRef.current = true;
+                                try {
+                                    await EncryptedStorage.removeItem('refreshToken');
+                                } catch (e) {
+                                    // iOS에서 드물게 removeItem 에러 발생 → 무시하고 진행
+                                    console.warn('removeItem error (ignored):', e);
+                                }
+                                dispatch(userSlice.actions.setUser({ id: '', email: '', accessToken: '' } as any));
+                                Alert.alert('알림', '토큰이 만료되어 로그아웃 됩니다.');
+                                isLoggingOutRef.current = false;
+                            }
+                            return Promise.reject(error);
+                        }
                         const { data } = await api.post(`/auth/refreshToken`,
                             {},
                             {
@@ -177,14 +193,30 @@ function AppInner() {
                             }
                         );
 
-                        console.log("data", data);
-
                         // 토큰 재발급
                         dispatch(userSlice.actions.setAccessToken(data.data.accessToken));
                         // 원래 요청
                         originalRequest.headers.authorization = `${data.data.accessToken}`;
                         return axios(originalRequest);
                     }
+                }
+                if (status === 401) {
+                    try {
+                        const refreshToken = await EncryptedStorage.getItem('refreshToken');
+                        if (!refreshToken) {
+                            if (!isLoggingOutRef.current) {
+                                isLoggingOutRef.current = true;
+                                try {
+                                    await EncryptedStorage.removeItem('refreshToken');
+                                } catch (e) {
+                                    console.warn('removeItem error (ignored):', e);
+                                }
+                                dispatch(userSlice.actions.setUser({ id: '', email: '', accessToken: '' } as any));
+                                Alert.alert('알림', '토큰이 만료되어 로그아웃 됩니다.');
+                                isLoggingOutRef.current = false;
+                            }
+                        }
+                    } catch { }
                 }
                 // 419에러 외에는 기존읜 catch(error)로
                 return Promise.reject(error);
@@ -313,9 +345,9 @@ function AppInner() {
                         component={TailingDeviceList}
                         options={{
                             title: '디바이스 목록',
-                            headerShown: true,
                             headerTitleAlign: 'center',
-                            headerBackTitle: '등록된 허브'
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
                         }}
                     />
                     <Stack.Screen
@@ -387,6 +419,17 @@ function AppInner() {
                         component={DeviceNameEdit}
                         options={{
                             title: '디바이스 이름 변경',
+                            headerTitleAlign: 'center',
+                            headerShadowVisible: false,
+                            headerBackTitleVisible: false,
+                            headerBackTitle: '더보기'
+                        }}
+                    />
+                    <Stack.Screen
+                        name="DevicePetConnection"
+                        component={DevicePetConnection}
+                        options={{
+                            title: '디바이스 펫 연결 변경',
                             headerTitleAlign: 'center',
                             headerShadowVisible: false,
                             headerBackTitleVisible: false,

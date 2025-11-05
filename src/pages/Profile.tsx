@@ -162,6 +162,19 @@ export default function Profile({ navigation }: any) {
 
                     <TouchableOpacity
                         style={styles.menuItem}
+                        onPress={() => navigation.navigate('DevicePetConnection')}
+                    >
+                        <View style={styles.menuLeft}>
+                            <View style={styles.menuIconContainer}>
+                                <Ionicons name="link-outline" size={20} color={COLORS.primary} />
+                            </View>
+                            <Text style={styles.menuText}>디바이스 펫 연결 변경</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={COLORS.hint} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
                         onPress={() => navigation.navigate('PrivacyPolicy')}
                     >
                         <View style={styles.menuLeft}>

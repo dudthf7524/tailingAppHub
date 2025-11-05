@@ -139,12 +139,12 @@ export default function ProfileEdit() {
         }
 
         // 전화번호 유효성 검사
-        if (!form.phone2.trim()) {
-            Alert.alert('확인', '전화번호를 입력하세요.');
+        if (!form.phone2.trim() || form.phone2.length !== 4) {
+            Alert.alert('확인', '전화번호 앞자리를 4자리로 입력하세요.');
             return;
         }
-        if (!form.phone3.trim()) {
-            Alert.alert('확인', '전화번호를 입력하세요.');
+        if (!form.phone3.trim() || form.phone3.length !== 4) {
+            Alert.alert('확인', '전화번호 뒷자리를 4자리로 입력하세요.');
             return;
         }
 

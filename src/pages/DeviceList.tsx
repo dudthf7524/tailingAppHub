@@ -105,7 +105,7 @@ const TailingDeviceList = () => {
                 : `/device/list`;
             
             const result = await api.get(url, {
-                headers: { authorization: `Bearer ${accessToken}` },
+                headers: { authorization: `${accessToken}` },
             });
             // console.log("result", result);
             if (Array.isArray(result.data.data)) {
@@ -172,7 +172,7 @@ const TailingDeviceList = () => {
                 name: name,
                 hubAddress: hubAddress, // 허브 ID 추가
             }, {
-                headers: { authorization: `Bearer ${accessToken}` },
+                headers: { authorization: `${accessToken}` },
             });
             // 성공 후 DB 리스트 새로고침
             await fetchList();
@@ -208,7 +208,7 @@ const TailingDeviceList = () => {
                 deviceAddress: selectedDeviceId, // DB에서 가져온 실제 디바이스 ID 사용
                 petId: pet.id,
             }, {
-                headers: { authorization: `Bearer ${accessToken}` },
+                headers: { authorization: `${accessToken}` },
             });
 
             Alert.alert('완료', `${pet.name}이(가) ${selectedDeviceName}에 연결되었습니다.`);

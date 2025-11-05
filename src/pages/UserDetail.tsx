@@ -3,6 +3,7 @@ import {
     View, Text, StyleSheet, TouchableOpacity,
     ScrollView, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, Pressable
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import { useAppDispatch } from '../store';
@@ -205,9 +206,10 @@ export default function UserDetail({ navigation, route }: any) {
     };
 
     return (
-        <ScrollView style={styles.container}>
-            {/* 사용자 정보 섹션 */}
-            <View style={styles.section}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
+            <ScrollView style={styles.scrollView}>
+                {/* 사용자 정보 섹션 */}
+                <View style={styles.section}>
                 {/* 이름 헤더 - 수정 버튼 포함 */}
                 <View style={styles.headerRow}>
                     <View style={{ flex: 1 }}>
@@ -305,7 +307,7 @@ export default function UserDetail({ navigation, route }: any) {
                 presentationStyle="pageSheet"
             >
                 <KeyboardAvoidingView
-                    behavior={Platform.select({ ios: 'padding', android: undefined })}
+                    behavior={Platform.select({ ios: 'padding', android: "height" })}
                     style={{ flex: 1 }}
                 >
                     <View style={styles.modalContainer}>
@@ -343,8 +345,12 @@ export default function UserDetail({ navigation, route }: any) {
                                             autoCorrect={false}
                                         />
                                         <View style={styles.rightAction} pointerEvents="box-none">
-                                            <TouchableOpacity onPress={() => setShowCurrentPw(s => !s)}>
-                                                <Text style={styles.eye}>{showCurrentPw ? 'Hide' : 'Show'}</Text>
+                                            <TouchableOpacity onPress={() => setShowCurrentPw(s => !s)} style={styles.eyeButton}>
+                                                <Ionicons
+                                                    name={showCurrentPw ? "eye" : "eye-off"}
+                                                    size={20}
+                                                    color={COLORS.hint}
+                                                />
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -365,8 +371,12 @@ export default function UserDetail({ navigation, route }: any) {
                                             autoCorrect={false}
                                         />
                                         <View style={styles.rightAction} pointerEvents="box-none">
-                                            <TouchableOpacity onPress={() => setShowNewPw(s => !s)}>
-                                                <Text style={styles.eye}>{showNewPw ? 'Hide' : 'Show'}</Text>
+                                            <TouchableOpacity onPress={() => setShowNewPw(s => !s)} style={styles.eyeButton}>
+                                                <Ionicons
+                                                    name={showNewPw ? "eye" : "eye-off"}
+                                                    size={20}
+                                                    color={COLORS.hint}
+                                                />
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -387,8 +397,12 @@ export default function UserDetail({ navigation, route }: any) {
                                             autoCorrect={false}
                                         />
                                         <View style={styles.rightAction} pointerEvents="box-none">
-                                            <TouchableOpacity onPress={() => setShowConfirmPw(s => !s)}>
-                                                <Text style={styles.eye}>{showConfirmPw ? 'Hide' : 'Show'}</Text>
+                                            <TouchableOpacity onPress={() => setShowConfirmPw(s => !s)} style={styles.eyeButton}>
+                                                <Ionicons
+                                                    name={showConfirmPw ? "eye" : "eye-off"}
+                                                    size={20}
+                                                    color={COLORS.hint}
+                                                />
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -412,7 +426,8 @@ export default function UserDetail({ navigation, route }: any) {
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
-        </ScrollView>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 
@@ -420,6 +435,9 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.bg,
+    },
+    scrollView: {
+        flex: 1,
     },
     section: {
         backgroundColor: COLORS.cardBg,
@@ -553,6 +571,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: COLORS.hint,
         fontWeight: '600',
+    },
+    eyeButton: {
+        padding: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     modalButton: {
         marginTop: 10,

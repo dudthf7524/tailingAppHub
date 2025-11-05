@@ -5,6 +5,7 @@ import {
     KeyboardAvoidingView, Platform, ScrollView, Alert, Modal
 } from 'react-native';
 import DaumPostcode from '@actbase/react-daum-postcode';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import api from '../constant/contants';
 import { useNavigation } from '@react-navigation/native';
 
@@ -58,14 +59,20 @@ export default function SignUpScreen() {
     const [cooldown, setCooldown] = useState(0); // 재전송 쿨다운(초)
     const cooldownRef = useRef<NodeJS.Timeout | null>(null);
     const [emailSendCode, setEmailSendCode] = useState("");
+    const [codeSentTime, setCodeSentTime] = useState<number | null>(null); // 코드 발송 시간 (밀리초)
 
     // 주소 검색 모달 상태
     const [showAddressModal, setShowAddressModal] = useState(false);
+    
+    // 이메일 안내 툴팁 상태
+    const [showEmailTooltip, setShowEmailTooltip] = useState(false);
 
     const set = (k: keyof User, v: string) => {
         if (k === 'email') {
             // 이메일이 바뀌면 인증 초기화
             setEmailVerified(false);
+            setEmailSendCode('');
+            setCodeSentTime(null);
             setForm(prev => ({ ...prev, [k]: v, emailCode: '' }));
             return;
         }
@@ -85,7 +92,7 @@ export default function SignUpScreen() {
 
     // 전화번호 입력 핸들러
     const handlePhoneInput = (field: 'phone2' | 'phone3', value: string) => {
-        const digits = value.replace(/\D/g, '');
+        const digits = value.replace(/\D/g, '').slice(0, 4);
         console.log(`🔢 전화번호 입력: ${field} = "${digits}" (원본: "${value}")`);
         setForm(prev => {
             const newForm = { ...prev, [field]: digits };
@@ -131,6 +138,8 @@ export default function SignUpScreen() {
             // 6자리 랜덤 인증번호 생성
             const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
             setEmailSendCode(randomCode);
+            setCodeSentTime(Date.now()); // 코드 발송 시간 저장
+            
             // 이메일과 랜덤번호를 서버로 전송
             await api.post('/user/email/send', {
                 email: form.email,
@@ -140,6 +149,7 @@ export default function SignUpScreen() {
             Alert.alert('발송 완료', '인증 코드가 이메일로 전송되었습니다.');
         } catch (e: any) {
             setCooldown(0);
+            setCodeSentTime(null);
             Alert.alert('오류', e?.message ?? '코드 발송에 실패했습니다.');
         } finally {
             setEmailSending(false);
@@ -152,12 +162,31 @@ export default function SignUpScreen() {
             Alert.alert('확인', '6자리 인증 코드를 입력하세요.');
             return;
         }
+        
+        // 코드 만료 시간 체크 (180초 = 180000 밀리초)
+        if (codeSentTime !== null) {
+            const elapsedTime = Date.now() - codeSentTime;
+            const codeExpiryTime = 180 * 1000; // 180초를 밀리초로 변환
+            
+            if (elapsedTime > codeExpiryTime) {
+                Alert.alert('인증 실패', '인증 코드가 만료되었습니다. 새로운 코드를 발송해주세요.');
+                setEmailVerified(false);
+                setEmailSendCode('');
+                setCodeSentTime(null);
+                return;
+            }
+        } else {
+            // 코드가 발송되지 않은 경우
+            Alert.alert('확인', '인증 코드를 먼저 발송해주세요.');
+            return;
+        }
+        
         if (form.emailCode === emailSendCode) {
             setEmailVerified(true);
             Alert.alert('인증 완료', '이메일 인증이 완료되었습니다.');
         } else {
             setEmailVerified(false);
-            Alert.alert('인증 실패', '인증에 실패했습니다.');
+            Alert.alert('인증 실패', '인증 코드가 올바르지 않습니다.');
         }
     };
 
@@ -230,27 +259,27 @@ export default function SignUpScreen() {
         }
 
         // 전화번호 유효성 검사
-        if (!form.phone2.trim()) {
-            Alert.alert('확인', '전화번호를 입력하세요.');
+        if (!form.phone2.trim() || form.phone2.length !== 4) {
+            Alert.alert('확인', '전화번호 앞자리를 4자리로 입력하세요.');
             return;
         }
-        if (!form.phone3.trim()) {
-            Alert.alert('확인', '전화번호를 입력하세요.');
+        if (!form.phone3.trim() || form.phone3.length !== 4) {
+            Alert.alert('확인', '전화번호 뒷자리를 4자리로 입력하세요.');
             return;
         }
 
         // 이메일 인증 검사
-        if (!emailVerified) {
-            Alert.alert('확인', '이메일 인증을 완료해주세요.');
-            return;
-        }
+        // if (!emailVerified) {
+        //     Alert.alert('확인', '이메일 인증을 완료해주세요.');
+        //     return;
+        // }
         try {
             setSubmitting(true);
             const fullAddress = `${form.baseAddress} ${form.detailAddress}`.trim();
             const fullPhone = form.phone1 + "-" + form.phone2 + "-" + form.phone3;
             console.log("fullPhone", fullPhone);
             console.log("fullAddress", fullAddress);
-            await api.post('/user/join', {
+            const response = await api.post('/user/join', {
                 email: form.email.trim(),
                 name: form.name.trim(),
                 zipCode: form.zipCode.trim(),
@@ -261,12 +290,19 @@ export default function SignUpScreen() {
                 phone: fullPhone, // 전체 전화번호도 함께 전송
             });
             // 회원가입 성공 시 알림 후 로그인 페이지로 이동
-            Alert.alert('회원가입 완료', '로그인 페이지로 이동합니다.', [
-                {
-                    text: '확인',
-                    onPress: () => navigation.reset({ index: 0, routes: [{ name: '로그인' }] }),
-                },
-            ]);
+
+            if(response.status === 202){
+                Alert.alert('회원가입 실패', response.data.message);
+                return;
+            }else if(response.status === 200){
+                Alert.alert('회원가입 완료', '로그인 페이지로 이동합니다.', [
+                    {
+                        text: '확인',
+                        onPress: () => navigation.reset({ index: 0, routes: [{ name: '로그인' }] }),
+                    },
+                ]);
+            }
+            
 
         } catch (e: any) {
             Alert.alert('오류', e?.message ?? '회원가입에 실패했습니다.');
@@ -277,7 +313,7 @@ export default function SignUpScreen() {
 
     return (
         <View style={styles.container}>
-            <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: undefined })} style={{ flex: 1 }}>
+            <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: "height" })} style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" >
                     {/* 카드 */}
                     <View style={styles.card}>
@@ -346,24 +382,53 @@ export default function SignUpScreen() {
                         </View>
 
                         {/* 이메일 + 코드 발송 */}
-                        <LabeledInput
-                            label="이메일"
-                            value={form.email}
-                            onChangeText={v => set('email', v)}
-                            placeholder="name@hospital.com"
-                            autoCapitalize="none"
-                            keyboardType="email-address"
-                            rightAction={
+                        <View style={{ marginBottom: 16 }}>
+                            <View style={styles.labelWithIcon}>
+                                <Text style={styles.inputLabel}>이메일</Text>
                                 <TouchableOpacity
-                                    onPress={sendEmailCode}
-                                    disabled={emailSending || cooldown > 0}
+                                    onPress={() => setShowEmailTooltip(!showEmailTooltip)}
+                                    style={styles.infoIconButton}
                                 >
-                                    <Text style={[styles.actionLink, (emailSending || cooldown > 0) && { opacity: 0.5 }]}>
-                                        {cooldown > 0 ? `재전송(${cooldown}s)` : '코드 발송'}
-                                    </Text>
+                                    <Ionicons name="information-circle-outline" size={20} color={COLORS.hint} />
                                 </TouchableOpacity>
-                            }
-                        />
+                            </View>
+                            <View style={[styles.inputWrap, emailVerified && styles.fixedInputWrap]}>
+                                <TextInput
+                                    style={[styles.input, emailVerified && styles.fixedInput]}
+                                    value={form.email}
+                                    onChangeText={v => set('email', v)}
+                                    placeholder="name@hospital.com"
+                                    placeholderTextColor={COLORS.hint}
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                    autoCorrect={false}
+                                    editable={!emailVerified}
+                                />
+                                {!emailVerified && (
+                                    <View style={styles.rightAction} pointerEvents="box-none">
+                                        <TouchableOpacity
+                                            onPress={sendEmailCode}
+                                            disabled={emailSending || cooldown > 0}
+                                        >
+                                            <Text style={[styles.actionLink, (emailSending || cooldown > 0) && { opacity: 0.5 }]}>
+                                                {cooldown > 0 ? `재전송(${cooldown}s)` : '코드 발송'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </View>
+                            {showEmailTooltip && (
+                                <View style={styles.tooltipContainer}>
+                                    <View style={styles.tooltipArrow} />
+                                    <View style={styles.tooltipContent}>
+                                        <Text style={styles.tooltipTitle}>이메일 안내</Text>
+                                        <Text style={styles.tooltipText}>
+                                            이 이메일은 로그인할 때 사용하는 계정 아이디입니다. 비밀번호 찾기 안내도 이 주소로 발송되니 정확히 입력해주세요.
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
                         <LabeledInput
                             label="이메일 인증코드"
                             value={form.emailCode}
@@ -388,8 +453,12 @@ export default function SignUpScreen() {
                             placeholder="8자 이상"
                             secureTextEntry={!showPw}
                             rightAction={
-                                <TouchableOpacity onPress={() => setShowPw(s => !s)}>
-                                    <Text style={styles.eye}>{showPw ? 'Hide' : 'Show'}</Text>
+                                <TouchableOpacity onPress={() => setShowPw(s => !s)} style={styles.eyeButton}>
+                                    <Ionicons
+                                        name={showPw ? "eye" : "eye-off"}
+                                        size={20}
+                                        color={COLORS.hint}
+                                    />
                                 </TouchableOpacity>
                             }
                         />
@@ -400,8 +469,12 @@ export default function SignUpScreen() {
                             placeholder="비밀번호 재입력"
                             secureTextEntry={!showPw2}
                             rightAction={
-                                <TouchableOpacity onPress={() => setShowPw2(s => !s)}>
-                                    <Text style={styles.eye}>{showPw2 ? 'Hide' : 'Show'}</Text>
+                                <TouchableOpacity onPress={() => setShowPw2(s => !s)} style={styles.eyeButton}>
+                                    <Ionicons
+                                        name={showPw2 ? "eye" : "eye-off"}
+                                        size={20}
+                                        color={COLORS.hint}
+                                    />
                                 </TouchableOpacity>
                             }
                         />
@@ -569,7 +642,7 @@ const styles = StyleSheet.create({
         // shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12,
         // shadowOffset: { width: 0, height: 6 }, elevation: 3,
     },
-    inputLabel: { marginBottom: 8, color: COLORS.text, fontWeight: '600' },
+    inputLabel: { marginBottom: 4, color: COLORS.text, fontWeight: '600' },
     inputWrap: {
         position: 'relative', backgroundColor: '#fff', borderRadius: 10,
         borderWidth: 1, borderColor: '#EFE7E0', paddingHorizontal: 18, paddingVertical: 10,
@@ -577,6 +650,11 @@ const styles = StyleSheet.create({
     input: { height: 44, fontSize: 16, color: COLORS.text, paddingRight: 80, flex: 1 },
     rightAction: { position: 'absolute', right: 14, top: 10, height: 44, justifyContent: 'center', alignItems: 'center' },
     eye: { fontSize: 14, color: COLORS.hint, fontWeight: '600' },
+    eyeButton: {
+        padding: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     actionLink: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
     errorText: { marginTop: 6, color: COLORS.error, fontSize: 12 },
     hintText: { marginTop: 6, color: COLORS.hint, fontSize: 12 },
@@ -625,8 +703,8 @@ const styles = StyleSheet.create({
     fixedInput: {
         color: COLORS.text,
         fontWeight: '700',
-        textAlign: 'center',
         fontSize: 16,
+        paddingRight: 18,
     },
     fixedInputText: {
         color: COLORS.text,
@@ -654,5 +732,49 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         padding: 0,
         margin: 0,
+    },
+    // 이메일 툴팁 스타일
+    labelWithIcon: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    infoIconButton: {
+        marginLeft: 6,
+        padding: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    tooltipContainer: {
+        marginTop: 8,
+        position: 'relative',
+    },
+    tooltipArrow: {
+        width: 0,
+        height: 0,
+        borderLeftWidth: 8,
+        borderRightWidth: 8,
+        borderBottomWidth: 8,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderBottomColor: '#F5F0EB',
+        alignSelf: 'center',
+        marginBottom: -1,
+    },
+    tooltipContent: {
+        backgroundColor: '#F5F0EB',
+        borderRadius: 12,
+        padding: 16,
+    },
+    tooltipTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.text,
+        marginBottom: 8,
+    },
+    tooltipText: {
+        fontSize: 14,
+        color: COLORS.text,
+        lineHeight: 20,
     },
 });

@@ -42,8 +42,8 @@ export const TailingDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
     // const ws = new WebSocket('ws://192.168.0.100:81');
     // const ws = new WebSocket('ws://192.168.0.42:81');
     // const ws = new WebSocket('ws://192.168.0.42:3080/ws');
-    // const ws = new WebSocket('ws://192.168.150.168:3080/ws');
-    const ws = new WebSocket('ws://49.50.132.197:3080/ws');
+    const ws = new WebSocket('ws://192.168.150.168:3080/ws');
+    // const ws = new WebSocket('ws://49.50.132.197:3080/ws');
 
     wsRef.current = ws;
 
