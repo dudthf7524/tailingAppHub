@@ -86,16 +86,7 @@ function MainTabs() {
                     ),
                 }}
             />
-            {/* <Tab.Screen
-                name="CSVDownload"
-                component={CSVDownload}
-                options={{
-                    title: 'CSV 다운로드',
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="download-outline" size={size} color={color} />
-                    ),
-                }}
-            /> */}
+            
             <Tab.Screen
                 name="Profile"
                 component={Profile}
@@ -244,17 +235,7 @@ function AppInner() {
         const getTokenAndRefresh = async () => {
             try {
                 const refreshToken = await EncryptedStorage.getItem('refreshToken');
-                // if (!refreshToken) {
-                //     // 최소 3초 보장 후 BootSplash 숨기기
-                //     const elapsed = Date.now() - startTime;
-                //     const remaining = Math.max(0, MIN_SPLASH_DURATION - elapsed);
-                //     setTimeout(async () => {
-                //         await BootSplash.hide({ fade: true });
-                //         setAuthLoading(false);
-                //     }, remaining);
-                //     return;
-                // }
-
+        
                 const response = await api.post(`/auth/refreshToken`, {},
                     {
                         headers: { authorization: `${refreshToken}` },
@@ -275,20 +256,12 @@ function AppInner() {
                 // 최소 3초 보장 후 BootSplash 숨기기
                 const elapsed = Date.now() - startTime;
                 const remaining = Math.max(0, MIN_SPLASH_DURATION - elapsed);
-                // setTimeout(async () => {
-                //     await BootSplash.hide({ fade: true });
-                //     setAuthLoading(false);
-                // }, remaining);
+              
             }
         };
 
         getTokenAndRefresh();
     }, [dispatch]);
-
-    // 인증 확인 중일 때는 스플래시 스크린 표시 (bootsplash가 숨겨지기 전까지)
-    // if (isAuthLoading) {
-    //     return <SplashScreen />;
-    // }
 
     return (
         <Stack.Navigator>
